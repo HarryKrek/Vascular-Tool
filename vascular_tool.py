@@ -1,3 +1,4 @@
+#TODO clean up whatever tf is going on with my imports, this is getting excessive
 import matplotlib.pyplot as plt
 from skimage import data, io
 from skimage.color import rgb2gray, label2rgb
@@ -11,6 +12,8 @@ import pandas as pd
 from pathlib import Path
 import skan.csr
 import argparse
+import sknw
+import networkx as nx
 
 def find_images_in_path(pathdir):
     path = Path(pathdir)
@@ -21,6 +24,8 @@ def find_images_in_path(pathdir):
 
 def get_running_approval():
     pass
+
+
 
 def import_and_blur_image(imgPath, sigma = 3.5):
     img = io.imread(imgPath)
@@ -44,26 +49,43 @@ def create_skeleton(segmentation, area_min = 100):
     pruned_skel = skel_pruning_DSE(skel,skel_dist, area_min)
     return pruned_skel
 
-def find_branch_and_end_points(skel):
-    degree = skan.csr.make_degree_image(skel) 
-    branches = degree > 2
-    ends = np.nonzero(degree == 1)
-    branch_pts = np.nonzero(branches)
-    end_pts = np.nonzero(ends)
-    return (branch_pts, end_pts)
+def obtain_branch_and_end_points(graph):
+    bp = []
+    ep = []
+
+    nodes = graph.nodes()
+    for node in nodes:
+        if graph.degree[node] == 1:
+            ep.append(node)
+        elif graph.degree[node] > 2:
+            bp.append(node)
+    branchPoints = np.array([nodes[i]['o'] for i in bp])
+    endPoints = np.array([nodes[i]['o'] for i in ep])
+
+    return (branchPoints, endPoints)
 
 
-def process_image_results(segmentation, skeleton, branch_pts, end_pts):
+def vessel_statistics_from_graph(graph):
+    totalLen = 0
+    for (s,e) in graph.edges():
+        ps = graph[s][e]['weight']
+        totalLen += ps
+    
+    return totalLen, totalLen/len(graph.edges())
+
+def process_image_results(segmentation, graph):
+    branchPoints, endPoints = obtain_branch_and_end_points(graph)
     results = {}
     # Get number of cells
-    results["numPoints"] = len(branch_pts[0])
+    results["Branch Points"] = len(branchPoints)
+    results["End Points"] = len(endPoints)
     # Size of image
     imgSize = np.size(segmentation)
     # Area of Vessels
     results["vesselArea"] = np.count_nonzero(segmentation)
     # Percentage Area
     results["percentArea"] = results["vesselArea"]/imgSize * 100
-    results["vesselLength"] = np.count_nonzero(skeleton)
+    results["totalVesselLength"], results["avgVesselLength"] = vessel_statistics_from_graph(graph)
     return results
     
 def save_results_to_csv(savename,data):
@@ -82,12 +104,12 @@ def main(path: str, savename: str):
             segmentation = segment_image(blurred)
             cleaned_segmentation = remove_holes_and_small_items(segmentation)
             skel = create_skeleton(cleaned_segmentation)
-            branch_points, end_points = find_branch_and_end_points(skel)
-            img_results = process_image_results(cleaned_segmentation, skel, 
-                                                branch_points, end_points)
+            graph = sknw.build_sknw(skel)
+            img_results = process_image_results(segmentation, graph)
             print(img_results)
             results.append(img_results)
             bar()
+            break
     save_results_to_csv(savename, results)
 
 
