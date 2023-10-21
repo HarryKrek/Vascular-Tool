@@ -109,7 +109,7 @@ def main(path: str, savename: str):
             print(img_results)
             results.append(img_results)
             bar()
-            break
+            
     save_results_to_csv(savename, results)
 
 
