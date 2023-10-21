@@ -74,18 +74,22 @@ def vessel_statistics_from_graph(graph):
     return totalLen, totalLen/len(graph.edges())
 
 def process_image_results(segmentation, graph):
-    branchPoints, endPoints = obtain_branch_and_end_points(graph)
-    results = {}
-    # Get number of cells
-    results["Branch Points"] = len(branchPoints)
-    results["End Points"] = len(endPoints)
-    # Size of image
-    imgSize = np.size(segmentation)
-    # Area of Vessels
-    results["vesselArea"] = np.count_nonzero(segmentation)
-    # Percentage Area
-    results["percentArea"] = results["vesselArea"]/imgSize * 100
-    results["totalVesselLength"], results["avgVesselLength"] = vessel_statistics_from_graph(graph)
+    try:
+        branchPoints, endPoints = obtain_branch_and_end_points(graph)
+        results = {}
+        # Get number of cells
+        results["Branch Points"] = len(branchPoints)
+        results["End Points"] = len(endPoints)
+        # Size of image
+        imgSize = np.size(segmentation)
+        # Area of Vessels
+        results["vesselArea"] = np.count_nonzero(segmentation)
+        # Percentage Area
+        results["percentArea"] = results["vesselArea"]/imgSize * 100
+        results["totalVesselLength"], results["avgVesselLength"] = vessel_statistics_from_graph(graph)
+        results["Errors"] = ""
+    except Exception as e:
+        results["Errors"] = str(e)
     return results
     
 def save_results_to_csv(savename,data):
