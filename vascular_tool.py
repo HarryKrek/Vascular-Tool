@@ -14,6 +14,7 @@ import skan.csr
 import argparse
 import sknw
 import networkx as nx
+import tifffile
 
 def find_images_in_path(pathdir):
     path = Path(pathdir)
@@ -27,11 +28,11 @@ def get_running_approval():
 
 
 
-def import_and_blur_image(imgPath, sigma = 3.5):
+def import_and_blur_image(imgPath, sigma = 0.5):
     img = io.imread(imgPath)
     imgGrey = rgb2gray(img)
-    blurred = gaussian(imgGrey, sigma=(sigma, sigma), truncate=3.5, channel_axis=-1)
-    return blurred
+    #blurred = gaussian(imgGrey, sigma=(sigma, sigma), truncate=3.5, channel_axis=-1)
+    return img, imgGrey
 
 def segment_image(blurred):
     thresh = threshold_local(blurred , block_size = 301) 
@@ -40,14 +41,19 @@ def segment_image(blurred):
 
 def remove_holes_and_small_items(segmentation, min_object_size = 100, min_hole_size = 100):
     ensmallend = remove_small_objects(segmentation, min_size = 160, connectivity=8)
-    unholed = remove_small_holes(ensmallend, area_threshold = 100)
-    return unholed
+    #unholed = remove_small_holes(ensmallend, area_threshold = 100)
+    return ensmallend
 
 def create_skeleton(segmentation, area_min = 100):
     skel = skeletonize(segmentation)
     skel_dist = distance_transform_edt(segmentation,return_indices=False, return_distances=True)
-    pruned_skel = skel_pruning_DSE(skel,skel_dist, area_min)
-    return pruned_skel
+    pruned_skel = skel_pruning_DSE(skel,skel_dist,area_min).astype(np.uint16)
+    return skel
+
+def draw_and_save_images(image, segmentation,name):
+    masked = label2rgb(segmentation,image=image, colors = ['red'], alpha=0.5, saturation = 1)
+    tifffile.imsave(name, masked)
+
 
 def obtain_branch_and_end_points(graph):
     bp = []
@@ -98,20 +104,22 @@ def save_results_to_csv(savename,data):
 
 
 def main(path: str, savename: str):
-    path = "\\\\shares01.rdm.uq.edu.au\\HKUG2023-A10939\\20230304_075556_96 wel plate_2D co culture_ HAEC P2_ASC52 P8_20230303_4X_TIME LAPSE\\Wellc2\\F2"
-    savename = 'test.csv'
+    resultsPath = '.\\Results\\'
     images = find_images_in_path(path)
     results = [] #list of dictionaries
     with alive_bar(len(images)) as bar:
-        for image in images:
-            blurred = import_and_blur_image(image)
-            segmentation = segment_image(blurred)
-            cleaned_segmentation = remove_holes_and_small_items(segmentation)
-            skel = create_skeleton(cleaned_segmentation)
-            graph = sknw.build_sknw(skel)
-            img_results = process_image_results(segmentation, graph)
-            print(img_results)
-            results.append(img_results)
+        for i, image in enumerate(images):
+            if i % 5 == 0:
+                rgbimg, blurred = import_and_blur_image(image)
+                segmentation = segment_image(blurred)
+                #cleaned_segmentation = remove_holes_and_small_items(segmentation)
+                skel = create_skeleton(segmentation)
+                graph = sknw.build_sknw(skel)
+                img_results = process_image_results(segmentation, graph)
+                print(img_results)
+                results.append(img_results)
+                draw_and_save_images((rgbimg * 255).astype(np.uint8),
+                    segmentation, resultsPath + str(i)+'.tiff')
             bar()
             
     save_results_to_csv(savename, results)
