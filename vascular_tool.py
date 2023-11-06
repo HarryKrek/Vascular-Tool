@@ -23,35 +23,39 @@ def find_images_in_path(pathdir):
     images.sort()
     return images
 
+
 def get_running_approval():
     pass
-
-
 
 def import_and_blur_image(imgPath, sigma = 0.5):
     img = io.imread(imgPath)
     imgGrey = rgb2gray(img)
-    #blurred = gaussian(imgGrey, sigma=(sigma, sigma), truncate=3.5, channel_axis=-1)
-    return img, imgGrey
+    blurred = gaussian(imgGrey, sigma=(sigma, sigma), truncate=3.5, channel_axis=-1)
+    return img, blurred
 
 def segment_image(blurred):
     thresh = threshold_local(blurred , block_size = 301) 
+    #Apply segmentation threshold
     segmentation = blurred > thresh
     return segmentation
 
 def remove_holes_and_small_items(segmentation, min_object_size = 100, min_hole_size = 100):
     ensmallend = remove_small_objects(segmentation, min_size = 160, connectivity=8)
-    #unholed = remove_small_holes(ensmallend, area_threshold = 100)
-    return ensmallend
+    unholed = remove_small_holes(ensmallend, area_threshold = 100)
+    return unholed
 
 def create_skeleton(segmentation, area_min = 100):
+    #Skeletonisation
     skel = skeletonize(segmentation)
+    #DSE Pruning
     skel_dist = distance_transform_edt(segmentation,return_indices=False, return_distances=True)
     pruned_skel = skel_pruning_DSE(skel,skel_dist,area_min).astype(np.uint16)
-    return skel
+    return pruned_skel
 
 def draw_and_save_images(image, segmentation,name):
+    #Make an image
     masked = label2rgb(segmentation,image=image, colors = ['red'], alpha=0.5, saturation = 1)
+    #Save image, not working too well at the moment
     tifffile.imsave(name, masked)
 
 
