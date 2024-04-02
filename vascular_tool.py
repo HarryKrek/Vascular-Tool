@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from skimage import data, io
 from skimage.color import rgb2gray, label2rgb
 from skimage.morphology import skeletonize, remove_small_objects, remove_small_holes, isotropic_dilation
-from skimage.filters import gaussian, threshold_local
+from skimage.filters import gaussian, threshold_local, median
 import numpy as np
 from scipy.ndimage import distance_transform_edt
 from alive_progress import alive_bar
@@ -16,6 +16,7 @@ import networkx as nx
 import tifffile
 from skimage.exposure import adjust_gamma
 import plantcv.plantcv as pcv
+import os
 
 
 def find_images_in_path(pathdir):
@@ -42,9 +43,11 @@ def segment_image(blurred):
     segmentation = blurred > thresh
     return segmentation
 
-def remove_holes_and_small_items(segmentation, min_object_size = 1000, min_hole_size = 300):
-    ensmallend = remove_small_objects(segmentation, min_size = min_object_size, connectivity=8)
-    unholed = remove_small_holes(ensmallend, area_threshold = min_hole_size)
+def remove_holes_and_small_items(segmentation, min_object_size = 100, min_hole_size = 100):
+    #Median filter
+    medianFiltered = median(segmentation)
+    # ensmallend = remove_small_objects(medianFiltered, min_size = min_object_size, connectivity=8)
+    unholed = remove_small_holes(medianFiltered, area_threshold = min_hole_size)
     return unholed
 
 def create_skeleton(segmentation, line_min = 30):
@@ -53,11 +56,12 @@ def create_skeleton(segmentation, line_min = 30):
     pruned_skeleton, img, objects = pcv.morphology.prune(skel_img=skel, size=line_min)
     return pruned_skeleton
 
-def draw_and_save_images(image, segmentation,name):
+def draw_and_save_images(image, segmentation, name):
     #Make an image
-    masked = label2rgb(segmentation,image=image, colors = ['red'], alpha=0.5, saturation = 1)
+    masked = label2rgb(segmentation,image=image, colors = ['blue'], alpha=0.5, saturation = 1)
     #Save image, not working too well at the moment
-    tifffile.imsave(name, masked)
+    tifffile.imwrite(name,masked)
+    
 
 
 def obtain_branch_and_end_points(graph):
@@ -109,24 +113,25 @@ def save_results_to_csv(savename,data):
 
 
 def main(path: str, savename: str):
-    path = "F://F2//"
-    savename = ".\\test.csv"
-    resultsPath = '.\\Results\\'
+    path = "F://20230304_075556_96 wel plate_2D co culture_ HAEC P2_ASC52 P8_20230303_4X_TIME LAPSE//Wellc2//F2"
+    savename = ".\\18_03_24 Median Filtered c2_no_image_removal.csv"
+    resultsPath = os.path.abspath('./Results/')
     images = find_images_in_path(path)
     results = [] #list of dictionaries
     try:
         with alive_bar(len(images)) as bar:
             for i, image in enumerate(images):
-                rgbimg, blurred = import_and_blur_image(image)
-                segmentation = segment_image(blurred)
-                cleaned_segmentation = remove_holes_and_small_items(segmentation)
-                skel = create_skeleton(cleaned_segmentation)
-                graph = sknw.build_sknw(skel)
-                img_results = process_image_results(segmentation, graph)
-                print(img_results)
-                results.append(img_results)
-                #draw_and_save_images((rgbimg * 255).astype(np.uint8),
-                #    segmentation, resultsPath + str(i)+'.tiff')
+                if i % 10 ==0:
+                    rgbimg, blurred = import_and_blur_image(image)
+                    segmentation = segment_image(blurred)
+                    cleaned_segmentation = remove_holes_and_small_items(segmentation)
+                    skel = create_skeleton(cleaned_segmentation)
+                    graph = sknw.build_sknw(skel)
+                    img_results = process_image_results(segmentation, graph)
+                    print(img_results)
+                    results.append(img_results)
+                    draw_and_save_images((rgbimg * 255).astype(np.uint8),
+                       segmentation, resultsPath + str(i)+'.tiff')
                 bar()
     except Exception as e:
         print(e)
