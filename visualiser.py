@@ -2,14 +2,24 @@ import cv2
 import skimage
 import os
 import matplotlib.pyplot as plt
-import numpy as np
+import numpy as np 
+import kmeans1d
 
-from vascular_tool import find_images_in_path
+from vascular_tool import find_images_in_path, get_global_threshold
 
-video_Output = "wellc6.avi"
-originalPath = "F://20230304_075556_96 wel plate_2D co culture_ HAEC P2_ASC52 P8_20230303_4X_TIME LAPSE//Wellc2//F2"
+video_Output = "wellc9EqualizeAdapthist.avi"
+originalPath = "F://20230304_075556_96 wel plate_2D co culture_ HAEC P2_ASC52 P8_20230303_4X_TIME LAPSE//Wellc9//F2"
 resultsPath = './Results/'
 size = (1920,1080)
+
+
+def figure_to_array(fig):
+    #Function from stackOVerflow
+    #https://stackoverflow.com/questions/72399929/how-can-i-write-video-using-matplotlib-plot-images-to-opencv-library
+    fig.canvas.draw()
+    return np.array(fig.canvas.renderer._renderer)
+
+
 
 
 #cV2 Video Writer
@@ -17,11 +27,7 @@ video = cv2.VideoWriter(video_Output, cv2.VideoWriter_fourcc(*'MJPG'), 2, size)
 
 images = find_images_in_path(originalPath)
 
-def figure_to_array(fig):
-    #Function from stackOVerflow
-    #https://stackoverflow.com/questions/72399929/how-can-i-write-video-using-matplotlib-plot-images-to-opencv-library
-    fig.canvas.draw()
-    return np.array(fig.canvas.renderer._renderer)
+thresh = get_global_threshold(images)
 
 
 for i,imageLoc in enumerate(images):
@@ -34,7 +40,7 @@ for i,imageLoc in enumerate(images):
         #Generate the histogram
         #Convert to greyscale
         imgGrey = img[:,:,1] #Take the green channel
-        hist, bins = np.histogram(imgGrey.flatten(), bins=256, range=[0,1])
+        imgGrey = skimage.exposure.equalize_hist(imgGrey,nbins=256)
     
         fig, (ax1, ax2, ax3) = plt.subplots(1,3)
         dpi = fig.get_dpi()
@@ -45,7 +51,6 @@ for i,imageLoc in enumerate(images):
         
         ax2.hist(imgGrey.ravel(), bins = 256, histtype='step', color='black')
         #Get the otsu and put on just for fun
-        thresh= skimage.filters.threshold_otsu(imgGrey)
         ax2.axvline(thresh, color = 'r')
 
         ax3.imshow(resultImg)
