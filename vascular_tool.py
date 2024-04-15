@@ -60,12 +60,12 @@ def import_and_blur_image(imgPath, sigma = 0.5):
 def segment_image(blurred, thresh):
     #Convert to uint8
     uint8Image = (blurred * 255).astype(np.uint8)
-    thresh = threshold_local(uint8Image, block_size=301)
+    thresh = threshold_local(uint8Image, block_size=101)
     #Apply segmentation threshold 
     segmentation = uint8Image > thresh
     return segmentation
 
-def remove_holes_and_small_items(segmentation, min_object_size = 8, min_hole_size = 5):
+def remove_holes_and_small_items(segmentation, min_object_size = 10, min_hole_size = 5):
     #erode a bit
     eroded = isotropic_erosion(segmentation, 1)
     ensmallend = remove_small_objects(eroded, min_size = min_object_size, connectivity=8)
@@ -79,12 +79,15 @@ def create_skeleton(segmentation, line_min = 10):
     pruned_skeleton, img, objects = pcv.morphology.prune(skel_img=skel, size=line_min)
     return pruned_skeleton
 
-def draw_and_save_images(image, segmentation, branchPoints, endPoints, name):
+def draw_and_save_images(image, segmentation, bp, ep, skel, name):
     #Make an image
     masked = label2rgb(segmentation,image=image, colors = ['red'], alpha=0.6, saturation = 1)
     adjusted = (masked * 255).astype(np.uint8)
     fig, ax = plt.subplots()
     ax.imshow(adjusted)
+    plt.scatter([point[1] for point in bp], [point[0] for point in bp], color = 'blue')
+    plt.scatter([point[1] for point in ep], [point[0] for point in ep], color = 'green')
+    plt.imshow(skel, alpha=0.5)
     # ax.plot()
     #Save image, not working too well at the moment+
     skimage.io.imsave(name,adjusted)
@@ -110,7 +113,7 @@ def obtain_branch_and_end_points(graph):
 def vessel_statistics_from_graph(graph):
     totalLen = 0
     for (s,e) in graph.edges():
-        ps = graph[s][e]['weight'] 
+        ps = graph[s][e][0]['weight'] 
         totalLen += ps
 
     return totalLen, totalLen/len(graph.edges())
@@ -155,12 +158,12 @@ def main(path: str, savename: str):
                     segmentation = segment_image(blurred, globalThresh)
                     cleaned_segmentation = remove_holes_and_small_items(segmentation)
                     skel = create_skeleton(cleaned_segmentation)
-                    graph = sknw.build_sknw(skel)
+                    graph = sknw.build_sknw(skel, multi=True, iso=False, ring=True, full=True)
                     img_results, branchPoints, endPoints = process_image_results(cleaned_segmentation, graph)
                     print(img_results)
                     results.append(img_results)
                     draw_and_save_images(rgbimg,
-                       cleaned_segmentation, branchPoints, endPoints, os.path.abspath(resultsPath + str(i)+'.tiff'))
+                       cleaned_segmentation, branchPoints, endPoints, skel, os.path.abspath(resultsPath + str(i)+'.tiff'))
                 bar()
     except Exception as e:
         print(e)
