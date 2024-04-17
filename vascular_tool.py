@@ -18,6 +18,7 @@ import skimage
 import kmeans1d
 import plantcv.plantcv as pcv
 import os
+from multiprocessing import Pool,cpu_count,set_start_method
 
 
 def find_images_in_path(pathdir):
@@ -27,24 +28,24 @@ def find_images_in_path(pathdir):
     images.sort()
     return images
 
-def get_global_threshold(images):
-    #preallocate zeros for all the bins
-    histoTotal = np.zeros(255)
-    binVals = np.linspace(0,255,num=256)
-    for i,imageLoc in enumerate(images):
-        if i % 10 == 0:
-            img = skimage.io.imread(imageLoc)
-            imgGrey = img[:,:,1] #Take the green channel
-            imgAdapted1 = rescale_intensity(imgGrey)
-            imgAdapted = (skimage.exposure.equalize_adapthist(imgAdapted1,nbins=256)*255).astype(np.uint8)
+# def get_global_threshold(images):
+#     #preallocate zeros for all the bins
+#     histoTotal = np.zeros(255)
+#     binVals = np.linspace(0,255,num=256)
+#     for i,imageLoc in enumerate(images):
+#         if i % 10 == 0:
+#             img = skimage.io.imread(imageLoc)
+#             imgGrey = img[:,:,1] #Take the green channel
+#             imgAdapted1 = rescale_intensity(imgGrey)
+#             imgAdapted = (skimage.exposure.equalize_adapthist(imgAdapted1,nbins=256)*255).astype(np.uint8)
 
-            #get the values in bin form
-            imgArray = imgAdapted.ravel()
-            imageHistoN, _ = np.histogram(imgArray, bins=binVals)
-            histoTotal = histoTotal + imageHistoN
-    #Use k-means clustering to determine the global threshold
-    # yen_thresh = threshold_yen(histoTotal)
-    return None
+#             #get the values in bin form
+#             imgArray = imgAdapted.ravel()
+#             imageHistoN, _ = np.histogram(imgArray, bins=binVals)
+#             histoTotal = histoTotal + imageHistoN
+#     #Use k-means clustering to determine the global threshold
+#     # yen_thresh = threshold_yen(histoTotal)
+#     return None
 
 def get_running_approval():
     pass
@@ -57,7 +58,7 @@ def import_and_blur_image(imgPath, sigma = 0.5):
     blurred = gaussian(adapted_hist, sigma=(sigma, sigma), truncate=3.5, channel_axis=-1)
     return img, blurred
 
-def segment_image(blurred, thresh):
+def segment_image(blurred):
     #Convert to uint8
     uint8Image = (blurred * 255).astype(np.uint8)
     thresh = threshold_local(uint8Image, block_size=101)
@@ -65,7 +66,7 @@ def segment_image(blurred, thresh):
     segmentation = uint8Image > thresh
     return segmentation
 
-def remove_holes_and_small_items(segmentation, min_object_size = 10, min_hole_size = 5):
+def remove_holes_and_small_items(segmentation, min_object_size = 40, min_hole_size = 5):
     #erode a bit
     eroded = isotropic_erosion(segmentation, 1)
     ensmallend = remove_small_objects(eroded, min_size = min_object_size, connectivity=8)
@@ -91,6 +92,7 @@ def draw_and_save_images(image, segmentation, bp, ep, skel, name):
     # ax.plot()
     #Save image, not working too well at the moment+
     skimage.io.imsave(name,adjusted)
+    plt.close()
     
 
 
@@ -118,7 +120,7 @@ def vessel_statistics_from_graph(graph):
 
     return totalLen, totalLen/len(graph.edges())
 
-def process_image_results(segmentation, graph):
+def process_image_results(i, segmentation, graph):
     try:
         branchPoints, endPoints = obtain_branch_and_end_points(graph)
         results = {}
@@ -141,33 +143,36 @@ def save_results_to_csv(savename,data):
     df=pd.DataFrame(data)
     df.to_csv(savename)
 
+def worker_process(args):
+    try:
+        i, image, resultsPath = args
+
+        rgbimg, blurred = import_and_blur_image(image)
+        segmentation = segment_image(blurred)
+        cleaned_segmentation = remove_holes_and_small_items(segmentation)
+        skel = create_skeleton(cleaned_segmentation)
+        graph = sknw.build_sknw(skel, multi=True, iso=False, ring=True, full=True)
+        img_results, branchPoints, endPoints = process_image_results(i, cleaned_segmentation, graph)
+        print(img_results)
+        draw_and_save_images(rgbimg,
+            cleaned_segmentation, branchPoints, endPoints, skel, os.path.abspath(resultsPath + str(i)+'.tiff'))
+        return img_results
+    except Exception as e:
+        print(f"EXCEPTION: {e}")
+
 
 def main(path: str, savename: str):
-    path = "F://20230304_075556_96 wel plate_2D co culture_ HAEC P2_ASC52 P8_20230303_4X_TIME LAPSE//Wellc9//F2"
-    savename = ".\\08_04_24_test_new_cleaning_thresh_well_C9.csv"
+    path = "F://20230304_075556_96 wel plate_2D co culture_ HAEC P2_ASC52 P8_20230303_4X_TIME LAPSE//Wellc8//F2"
+    savename = ".\\17_04_well_c8_mThread"
     resultsPath = './Results/'
     images = find_images_in_path(path)
     results = [] #list of dictionaries
-    # globalThresh = get_global_threshold(images)
-    globalThresh = None
-    try:
-        with alive_bar(len(images)) as bar:
-            for i, image in enumerate(images):
-                if i % 5 ==0:
-                    rgbimg, blurred = import_and_blur_image(image)
-                    segmentation = segment_image(blurred, globalThresh)
-                    cleaned_segmentation = remove_holes_and_small_items(segmentation)
-                    skel = create_skeleton(cleaned_segmentation)
-                    graph = sknw.build_sknw(skel, multi=True, iso=False, ring=True, full=True)
-                    img_results, branchPoints, endPoints = process_image_results(cleaned_segmentation, graph)
-                    print(img_results)
-                    results.append(img_results)
-                    draw_and_save_images(rgbimg,
-                       cleaned_segmentation, branchPoints, endPoints, skel, os.path.abspath(resultsPath + str(i)+'.tiff'))
-                bar()
-    except Exception as e:
-        print(e)
-
+    args = [(i, image, resultsPath) for i,image in enumerate(images)]
+    set_start_method("spawn")
+    with Pool(cpu_count()) as p:
+        results = p.map(worker_process, args)
+        p.close()
+    # print(savename,results)
     save_results_to_csv(savename, results)
 
 
