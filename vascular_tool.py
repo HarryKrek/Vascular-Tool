@@ -50,7 +50,7 @@ def find_images_in_path(pathdir):
 def get_running_approval():
     pass
 
-def import_and_blur_image(imgPath, sigma = 0.5):
+def import_and_blur_image(imgPath, sigma = 1):
     img = io.imread(imgPath)
     imgGrey = img[:,:,1] #Take the green channel
     rescaled_grey = rescale_intensity(imgGrey)
@@ -66,7 +66,7 @@ def segment_image(blurred):
     segmentation = uint8Image > thresh
     return segmentation
 
-def remove_holes_and_small_items(segmentation, min_object_size = 40, min_hole_size = 5):
+def remove_holes_and_small_items(segmentation, min_object_size = 300, min_hole_size = 170):
     #erode a bit
     eroded = isotropic_erosion(segmentation, 1)
     ensmallend = remove_small_objects(eroded, min_size = min_object_size, connectivity=8)
@@ -86,12 +86,14 @@ def draw_and_save_images(image, segmentation, bp, ep, skel, name):
     adjusted = (masked * 255).astype(np.uint8)
     fig, ax = plt.subplots()
     ax.imshow(adjusted)
-    plt.scatter([point[1] for point in bp], [point[0] for point in bp], color = 'blue')
-    plt.scatter([point[1] for point in ep], [point[0] for point in ep], color = 'green')
-    plt.imshow(skel, alpha=0.5)
-    # ax.plot()
+    plt.scatter([point[1] for point in bp], [point[0] for point in bp], color = 'blue', s=5)
+    plt.scatter([point[1] for point in ep], [point[0] for point in ep], color = 'green', s=5)
+    plt.imshow(skel > 0, alpha=0.8)
     #Save image, not working too well at the moment+
-    skimage.io.imsave(name,adjusted)
+    # skimage.io.imsave(name,adjusted)
+    ax.axis('off')
+    plt.savefig(name, bbox_inches='tight', pad_inches=0, transparent=True)
+    # plt.show()
     plt.close()
     
 
@@ -155,7 +157,7 @@ def worker_process(args):
         img_results, branchPoints, endPoints = process_image_results(i, cleaned_segmentation, graph)
         print(img_results)
         draw_and_save_images(rgbimg,
-            cleaned_segmentation, branchPoints, endPoints, skel, os.path.abspath(resultsPath + str(i)+'.tiff'))
+            cleaned_segmentation, branchPoints, endPoints, skel, os.path.abspath(resultsPath + str(i)+'.png'))
         return img_results
     except Exception as e:
         print(f"EXCEPTION: {e}")
@@ -163,7 +165,7 @@ def worker_process(args):
 
 def main(path: str, savename: str):
     path = "F://20230304_075556_96 wel plate_2D co culture_ HAEC P2_ASC52 P8_20230303_4X_TIME LAPSE//Wellc8//F2"
-    savename = ".\\17_04_well_c8_mThread"
+    savename = ".\\24_04_well_c8_ASH_speckle_and_holes.csv"
     resultsPath = './Results/'
     images = find_images_in_path(path)
     results = [] #list of dictionaries
