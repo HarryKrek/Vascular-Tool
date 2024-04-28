@@ -5,13 +5,17 @@ from multiprocessing import Pool, cpu_count, set_start_method
 
 
 def main(config_path: str, imagePath: str, resultsPath: str) -> None:
-    # Open yaml config
-    # with open(config_path, "r") as cfg:
-    #     config = yaml.safe_load(config_path)
+    config_path = ".\\config.yml"
+    with open(config_path, "r") as file:
+        config = yaml.safe_load(file)
+
     full_images = find_images_in_path(imagePath)
     examplePoints = [0, floor((len(full_images) - 1) / 2), -1]
     images = [full_images[0], full_images[examplePoints[1]], full_images[-1]]
-    args = [(examplePoints[i], image, resultsPath) for i, image in enumerate(images)]
+
+    args = [
+        (examplePoints[i], image, resultsPath, config) for i, image in enumerate(images)
+    ]
     print("Running Example Images")
     print("Please note program will not close without closing all pyplot instances")
     with Pool(3) as p:

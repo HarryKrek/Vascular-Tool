@@ -1,0 +1,13 @@
+# Image Import and Blur
+Blur Sigma: 1
+
+#Small Object and Hole Removal
+Min Hole Size: 200 #pixels
+Min Object Size: 300 #pixels
+
+# Skeletonisation
+Min Line Length: 50 #pixels
+
+#Save Results
+Save Image: True
+Show Image: False
