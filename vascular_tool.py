@@ -10,11 +10,12 @@ from skimage.morphology import (
     isotropic_erosion,
     disk,
 )
-from skimage.measure import label
+from skimage.measure import label, regionprops
 from skimage.filters import gaussian, threshold_local, median
 from skimage.exposure import equalize_adapthist, rescale_intensity
 import numpy as np
 from scipy.ndimage import distance_transform_edt
+from skimage.graph import pixel_graph
 from alive_progress import alive_bar
 import pandas as pd
 from pathlib import Path
@@ -145,18 +146,21 @@ def draw_and_save_images(image, segmentation, bp, ep, skel, name, save=True, sho
         plt.close()
 
 
-def obtain_branch_and_end_points(graph):
-    bp = []
-    ep = []
+def obtain_branch_and_end_points(skel):
+    branchPoints = []
+    endPoints = []
 
-    nodes = graph.nodes()
-    for node in nodes:
-        if graph.degree[node] == 1:
-            ep.append(node)
-        elif graph.degree[node] > 2:
-            bp.append(node)
-    branchPoints = np.array([nodes[i]["o"] for i in bp])
-    endPoints = np.array([nodes[i]["o"] for i in ep])
+    degree_img = skan.csr.make_degree_image(skel)
+    endPntProp = regionprops(label((degree_img == 1) * 255))
+    branchPntProp = regionprops(label((degree_img > 2) * 255))
+
+    for pnt in endPntProp:
+        x0, y0 = pnt.centroid
+        endPoints.append([x0, y0])
+
+    for pnt in branchPntProp:
+        x0, y0 = pnt.centroid
+        branchPoints.append([x0, y0])
 
     return (branchPoints, endPoints)
 
@@ -170,9 +174,9 @@ def vessel_statistics_from_graph(graph):
     return totalLen, totalLen / len(graph.edges())
 
 
-def process_image_results(i, segmentation, graph):
+def process_image_results(i, segmentation, graph, skel):
     try:
-        branchPoints, endPoints = obtain_branch_and_end_points(graph)
+        branchPoints, endPoints = obtain_branch_and_end_points(skel)
         results = {}
         # Get number of cells
         results["Branch Points"] = len(branchPoints)
@@ -207,7 +211,7 @@ def worker_process(args):
         skel = create_skeleton(cleaned_segmentation)
         graph = sknw.build_sknw(skel, multi=True, iso=False, ring=True, full=True)
         img_results, branchPoints, endPoints = process_image_results(
-            i, cleaned_segmentation, graph
+            i, cleaned_segmentation, graph, skel
         )
         print(img_results)
         draw_and_save_images(
