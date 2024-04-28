@@ -10,6 +10,7 @@ from skimage.morphology import (
     isotropic_erosion,
     disk,
 )
+from skimage.measure import label
 from skimage.filters import gaussian, threshold_local, median
 from skimage.exposure import equalize_adapthist, rescale_intensity
 import numpy as np
@@ -26,7 +27,6 @@ import kmeans1d
 import plantcv.plantcv as pcv
 import os
 from multiprocessing import Pool, cpu_count, set_start_method
-import pyyaml
 
 
 def find_images_in_path(pathdir):
@@ -81,7 +81,7 @@ def segment_image(blurred):
     return segmentation
 
 
-def remove_holes_and_small_items(segmentation, min_object_size=300, min_hole_size=170):
+def remove_holes_and_small_items(segmentation, min_object_size=300, min_hole_size=200):
     # erode a bit
     eroded = isotropic_erosion(segmentation, 1)
     ensmallend = remove_small_objects(eroded, min_size=min_object_size, connectivity=8)
@@ -90,35 +90,56 @@ def remove_holes_and_small_items(segmentation, min_object_size=300, min_hole_siz
     return unholed
 
 
-def create_skeleton(segmentation, line_min=10):
+def create_skeleton(segmentation, line_min=50):
     # Skeletonisation
     skel = pcv.morphology.skeletonize(segmentation)
     pruned_skeleton, img, objects = pcv.morphology.prune(skel_img=skel, size=line_min)
     return pruned_skeleton
 
 
-def draw_and_save_images(
-    image, segmentation, bp, ep, skel, name, save=True, show=False
-):
+def draw_and_save_images(image, segmentation, bp, ep, skel, name, save=True, show=True):
+    if not save and not show:
+        pass
+
     # Make an image
     masked = label2rgb(
-        segmentation, image=image, colors=["red"], alpha=0.6, saturation=1
+        label(segmentation * 255),
+        image=image,
+        colors=["red"],
+        kind="overlay",
+        alpha=0.6,
+        bg_label=0,
+        bg_color=None,
+        saturation=1,
     )
-    adjusted = (masked * 255).astype(np.uint8)
+    # Mask skeleton
+    maskedSkel = label2rgb(
+        label(skel * 255),
+        image=masked,
+        colors=["white"],
+        kind="overlay",
+        alpha=1,
+        bg_label=0,
+        bg_color=None,
+        saturation=1,
+    )
+    adjusted = (maskedSkel * 255).astype(np.uint8)
     fig, ax = plt.subplots()
     ax.imshow(adjusted)
     plt.scatter(
-        [point[1] for point in bp], [point[0] for point in bp], color="blue", s=5
+        [point[1] for point in bp], [point[0] for point in bp], color="blue", s=2
     )
     plt.scatter(
-        [point[1] for point in ep], [point[0] for point in ep], color="green", s=5
+        [point[1] for point in ep], [point[0] for point in ep], color="green", s=2
     )
-    plt.imshow(skel > 0, alpha=0.8)
+    # plt.imshow(skel > 0, alpha=0.8)
     # Save image, not working too well at the moment+
     # skimage.io.imsave(name,adjusted)
     ax.axis("off")
-    plt.savefig(name, bbox_inches="tight", pad_inches=0, transparent=True)
+    if save:
+        plt.savefig(name, bbox_inches="tight", pad_inches=0, transparent=True)
     if show:
+        ax.set_title(name)
         plt.show()
     else:
         plt.close()
