@@ -19,6 +19,7 @@ import kmeans1d
 import plantcv.plantcv as pcv
 import os
 from multiprocessing import Pool,cpu_count,set_start_method
+import pyyaml
 
 
 def find_images_in_path(pathdir):
@@ -80,7 +81,7 @@ def create_skeleton(segmentation, line_min = 10):
     pruned_skeleton, img, objects = pcv.morphology.prune(skel_img=skel, size=line_min)
     return pruned_skeleton
 
-def draw_and_save_images(image, segmentation, bp, ep, skel, name):
+def draw_and_save_images(image, segmentation, bp, ep, skel, name, save=True, show = False):
     #Make an image
     masked = label2rgb(segmentation,image=image, colors = ['red'], alpha=0.6, saturation = 1)
     adjusted = (masked * 255).astype(np.uint8)
@@ -93,8 +94,10 @@ def draw_and_save_images(image, segmentation, bp, ep, skel, name):
     # skimage.io.imsave(name,adjusted)
     ax.axis('off')
     plt.savefig(name, bbox_inches='tight', pad_inches=0, transparent=True)
-    # plt.show()
-    plt.close()
+    if show:
+        plt.show()
+    else:
+        plt.close()
     
 
 
