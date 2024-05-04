@@ -1,13 +1,18 @@
 # Image Import and Blur
-Blur Sigma: 1
+Blur Sigma: 0.5
 
 #Small Object and Hole Removal
-Min Hole Size: 200 #pixels
-Min Object Size: 300 #pixels
+Min Hole Size: 300 #pixels
+Min Object Size: 400 #pixels
 
 # Skeletonisation
-Min Line Length: 50 #pixels
+Min Line Length: 10 #pixels
 
 #Save Results
 Save Image: True
 Show Image: False
+
+#Path and Savename
+Img Path: F://20230304_075556_96 wel plate_2D co culture_ HAEC P2_ASC52 P8_20230303_4X_TIME LAPSE//Wellc8//F2
+Results Path: ./Results/
+Spreadsheet Output Path: .\\30_04_24_wellc8.csv

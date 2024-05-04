@@ -133,12 +133,15 @@ def draw_and_save_images(image, segmentation, bp, ep, skel, name, config):
     )
     adjusted = (maskedSkel * 255).astype(np.uint8)
     fig, ax = plt.subplots()
+    fig.set_dpi(100)
+    fig.set_size_inches(16, 16)
+
     ax.imshow(adjusted)
     plt.scatter(
-        [point[1] for point in bp], [point[0] for point in bp], color="blue", s=2
+        [point[1] for point in bp], [point[0] for point in bp], color="blue", s=6
     )
     plt.scatter(
-        [point[1] for point in ep], [point[0] for point in ep], color="green", s=2
+        [point[1] for point in ep], [point[0] for point in ep], color="green", s=6
     )
     # plt.imshow(skel > 0, alpha=0.8)
     # Save image, not working too well at the moment+
@@ -183,8 +186,9 @@ def vessel_statistics_from_graph(graph):
 
 def process_image_results(i, segmentation, graph, skel):
     try:
-        branchPoints, endPoints = obtain_branch_and_end_points(skel)
         results = {}
+        results["Num"] = i
+        branchPoints, endPoints = obtain_branch_and_end_points(skel)
         # Get number of cells
         results["Branch Points"] = len(branchPoints)
         results["End Points"] = len(endPoints)
@@ -236,16 +240,19 @@ def worker_process(args):
 
 
 def main(path: str, savename: str, configPath: str):
-    path = "F://20230304_075556_96 wel plate_2D co culture_ HAEC P2_ASC52 P8_20230303_4X_TIME LAPSE//Wellc8//F2"
-    savename = ".\\24_04_well_c8_ASH_speckle_and_holes.csv"
-    resultsPath = "./Results/"
     configPath = ".\\config.yml"
     with open(configPath, "r") as file:
         config = yaml.safe_load(file)
 
+    path = config.get("Img Path")
+    savename = config.get("Spreadsheet Output Path")
+    resultsPath = config.get("Results Path")
+
     images = find_images_in_path(path)
     results = []  # list of dictionaries
-    args = [(i, image, resultsPath, config) for i, image in enumerate(images)]
+    args = [
+        (i, image, resultsPath, config) for i, image in enumerate(images) if i % 10 == 0
+    ]
     set_start_method("spawn")
     with Pool(cpu_count()) as p:
         results = p.map(worker_process, args)
