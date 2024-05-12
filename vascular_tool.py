@@ -67,7 +67,10 @@ def get_running_approval():
 def import_and_blur_image(imgPath, config):
     sigma = config.get("Blur Sigma")
     img = io.imread(imgPath)
-    imgGrey = img[:, :, 1]  # Take the green channel
+    if len(np.shape(img)) == 3:
+        imgGrey = img[:, :, 1]  # Take the green channel
+    else:
+        imgGrey = img
     rescaled_grey = rescale_intensity(imgGrey)
     adapted_hist = equalize_adapthist(rescaled_grey)
     blurred = gaussian(
@@ -96,12 +99,26 @@ def remove_holes_and_small_items(segmentation, config):
     return unholed
 
 
+def vessel_width_and_prune(skel, segmentation, config: dict):
+    # Compute Distance Image using SCIPI
+    distance_img = distance_transform_edt(segmentation)
+    # Use skel as a mask to get distance_skel:
+    distance_skel = distance_img * (skel > 0)
+    # Prune skeleton if below required width
+    new_skel = 2 * distance_skel > config.get("Minimum Vessel Width")
+    skel_width = new_skel * distance_img * 2
+    return np.uint8(new_skel * 255), skel_width
+
+
 def create_skeleton(segmentation, config):
     line_min = config.get("Min Line Length")
     # Skeletonisation
     skel = pcv.morphology.skeletonize(segmentation)
-    pruned_skeleton, img, objects = pcv.morphology.prune(skel_img=skel, size=line_min)
-    return pruned_skeleton
+    skelWidthPruned, skel_width = vessel_width_and_prune(skel, segmentation, config)
+    skelLengthPruned, _, _ = pcv.morphology.prune(
+        skel_img=skelWidthPruned, size=line_min
+    )
+    return skelLengthPruned, skel_width
 
 
 def draw_and_save_images(image, segmentation, bp, ep, skel, name, config):
@@ -173,22 +190,10 @@ def obtain_branch_and_end_points(graph: networkx.graph):
             # Branch Point
             branchPoints.append([nodePs[i, 0], nodePs[i, 1]])
 
-    # degree_img = skan.csr.make_degree_image(skel)
-    # endPntProp = regionprops(label((degree_img == 1) * 255))
-    # branchPntProp = regionprops(label((degree_img > 2) * 255))
-
-    # for pnt in endPntProp:
-    #     x0, y0 = pnt.centroid
-    #     endPoints.append([x0, y0])
-
-    # for pnt in branchPntProp:
-    #     x0, y0 = pnt.centroid
-    #     branchPoints.append([x0, y0])
-
     return (branchPoints, endPoints)
 
 
-def vessel_statistics_from_graph(graph):
+def vessel_statistics_from_graph(graph: networkx.graph):
     totalLen = 0
     for s, e in graph.edges():
         ps = graph[s][e][0]["weight"]
@@ -232,21 +237,17 @@ def worker_process(args):
         rgbimg, blurred = import_and_blur_image(image, config)
         segmentation = segment_image(blurred)
         eroded = isotropic_erosion(segmentation, 1)
-        segmentation_clean_one = remove_small_objects(
-            eroded, min_size=100, connectivity=8
-        )
-        cleaned_segmentation = remove_holes_and_small_items(
-            segmentation_clean_one, config
-        )
-        skel = create_skeleton(cleaned_segmentation, config)
+        cleaned_segmentation = remove_holes_and_small_items(eroded, config)
+        skel, width_im = create_skeleton(cleaned_segmentation, config)
         graph = sknw.build_sknw(skel, multi=True, iso=False, ring=True, full=True)
         img_results, branchPoints, endPoints = process_image_results(
-            i, segmentation_clean_one, graph, skel
+            i, cleaned_segmentation, graph, skel
         )
+
         print(img_results)
         draw_and_save_images(
             rgbimg,
-            segmentation_clean_one,
+            cleaned_segmentation,
             branchPoints,
             endPoints,
             skel,
