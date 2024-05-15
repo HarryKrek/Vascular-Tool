@@ -111,21 +111,28 @@ def vessel_width_and_prune(skel, segmentation, config: dict):
     return np.uint8(new_skel * 255), skel_width
 
 
-def prune_skeleton_with_graph(graph: networkx.Graph, config: dict) -> networkx.Graph:
-    line_min = config.get("Min Line Length")
-    edgeRemovalCandidates = []
+def prune_skeleton_spurs_with_graph(
+    graph: networkx.MultiGraph, config: dict
+) -> networkx.MultiGraph:
+    line_min = config.get("Min Spur Line Length")
+    nodeRemovalCandidates = []
+
     edges = graph.edges
     for edgeLoc in edges:
         edge = edges[edgeLoc]
         if edge.get("weight") < line_min:
-            edgeRemovalCandidates.append(edgeLoc)
+            # Check if nodes are on the edge
+            for node in edgeLoc:
+                neighbours = sum(1 for _ in graph.neighbors(node))
+                if neighbours == 1:
+                    nodeRemovalCandidates.append(node)
 
     # Remove edges from the graph
-    graph.remove_edges_from(edgeRemovalCandidates)
+    graph.remove_nodes_from(nodeRemovalCandidates)
     return graph
 
 
-def generate_skeleton_from_graph(shape: tuple, graph: networkx.Graph):
+def generate_skeleton_from_graph(shape: tuple, graph: networkx.MultiGraph):
     skel = np.zeros(shape)
     # Plot every point on the graph on the new skeleton
     for u, v, l in graph.edges:
@@ -145,7 +152,7 @@ def create_skeleton(segmentation, config):
     graph = sknw.build_sknw(
         skelWidthPruned, multi=True, iso=False, ring=True, full=True
     )
-    graph = prune_skeleton_with_graph(graph, config)
+    graph = prune_skeleton_spurs_with_graph(graph, config)
     skelLengthPruned = generate_skeleton_from_graph(np.shape(skel), graph)
     return skelLengthPruned, skel_width, graph
 
@@ -203,7 +210,7 @@ def draw_and_save_images(image, segmentation, bp, ep, skel, name, config):
         plt.close()
 
 
-def obtain_branch_and_end_points(graph: networkx.graph):
+def obtain_branch_and_end_points(graph: networkx.MultiGraph):
     branchPoints = []
     endPoints = []
 
@@ -222,7 +229,7 @@ def obtain_branch_and_end_points(graph: networkx.graph):
     return (branchPoints, endPoints)
 
 
-def vessel_statistics_from_graph(graph: networkx.graph):
+def vessel_statistics_from_graph(graph: networkx.MultiGraph):
     totalLen = 0
     for s, e in graph.edges():
         ps = graph[s][e][0]["weight"]
