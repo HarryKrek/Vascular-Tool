@@ -30,6 +30,7 @@ import os
 from multiprocessing import Pool, cpu_count, set_start_method
 import yaml
 import networkx
+from time import time
 
 
 def find_images_in_path(pathdir):
@@ -140,9 +141,9 @@ def draw_and_save_images(image, segmentation, bp, ep, skel, name, config):
     )
     # Mask skeleton
     maskedSkel = label2rgb(
-        label(skel * 255),
+        label(isotropic_dilation(skel * 255, 3)),
         image=masked,
-        colors=["white"],
+        colors=["yellow"],
         kind="overlay",
         alpha=1,
         bg_label=0,
@@ -156,10 +157,10 @@ def draw_and_save_images(image, segmentation, bp, ep, skel, name, config):
 
     ax.imshow(adjusted)
     plt.scatter(
-        [point[1] for point in bp], [point[0] for point in bp], color="blue", s=6
+        [point[1] for point in bp], [point[0] for point in bp], color="blue", s=10
     )
     plt.scatter(
-        [point[1] for point in ep], [point[0] for point in ep], color="green", s=6
+        [point[1] for point in ep], [point[0] for point in ep], color="green", s=10
     )
     # plt.imshow(skel > 0, alpha=0.8)
     # Save image, not working too well at the moment+
@@ -260,6 +261,7 @@ def worker_process(args):
 
 
 def main(path: str, savename: str, configPath: str):
+    startTime = time()
     configPath = ".\\config.yml"
     with open(configPath, "r") as file:
         config = yaml.safe_load(file)
@@ -279,6 +281,8 @@ def main(path: str, savename: str, configPath: str):
         p.close()
     # print(savename,results)
     save_results_to_csv(savename, results)
+    elapsed = time() - startTime
+    print(f"Completed Processing in {elapsed} seconds")
 
 
 if __name__ == "__main__":
