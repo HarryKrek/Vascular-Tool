@@ -31,6 +31,7 @@ from multiprocessing import Pool, cpu_count, set_start_method
 import yaml
 import networkx
 from time import time
+from copy import deepcopy
 
 
 def find_images_in_path(pathdir):
@@ -117,6 +118,11 @@ def prune_skeleton_spurs_with_graph(
     line_min = config.get("Min Spur Line Length")
     nodeRemovalCandidates = []
 
+    # If node removal is 0 simply return the graph unchanged
+    if line_min <= 0:
+        return graph
+
+    # Continue as normal
     edges = graph.edges
     for edgeLoc in edges:
         edge = edges[edgeLoc]
@@ -130,6 +136,79 @@ def prune_skeleton_spurs_with_graph(
     # Remove edges from the graph
     graph.remove_nodes_from(nodeRemovalCandidates)
     return graph
+
+
+def construct_removal_dict(graph: networkx.MultiGraph, edge: dict, oldNodes: tuple):
+    outputDict = {}
+    # Split the current edge in half
+    length = edge["pts"].shape[0]  # Length of Array
+    outputDict["NewNode"] = edge["pts"][length // 2]
+    # Calculate Weight and Split List of Points in half (Node should be included in both)
+    outputDict["weightAdj"] = edge["weight"] / 2
+    outputDict["pointsArrays"] = np.split(edge["pts"], [length // 2], axis=0)
+    # Get edge details for both nodes
+    nodeEdges = []
+    gen = (node for node in oldNodes if node != 0)
+    for node in gen:
+        nodes = networkx.all_neighbors(graph, node)
+        nodeEdges.append(nodes)
+    # Fill out rest of dictionary
+    outputDict["nodeEdges"] = nodeEdges
+    outputDict["oldNodes"] = oldNodes
+
+    return outputDict
+
+
+def reconstruct_network_with_modifications(
+    oldGraph: networkx.MultiGraph, modifications: list[dict]
+):
+    # Copy old graph
+
+    newGraph = deepcopy(oldGraph)
+    nodeId = max(oldGraph.nodes) + 1
+    for mod in modifications:
+        # Remove Nodes
+        oldNode = mod["oldNodes"]
+        newGraph.remove_nodes_from(oldNode)
+        # Add new Node in centre
+        newGraph.add_node(nodeId)
+        # Add edges for new Node (based upon old ones)
+        # For Loop (LHS/RHS point)
+        for i in range(2):
+            connectedNodes = mod["nodeEdges"][i]
+            for node in connectedNodes:
+                if node in oldNode:
+                    continue
+                oldEdge = oldGraph.edges[(oldNode[i], node, 0)]
+                # Create new weights and points
+                newWeight = oldEdge["weight"] + mod["weightAdj"]
+                newPoints = np.append(oldEdge["pts"], mod["pointsArrays"][i], axis=0)
+                # Create new edge
+                newGraph.add_edge(nodeId, node, pts=newPoints, weight=newWeight)
+        nodeId += 1
+    return newGraph
+
+
+def consolidate_internal_graph_edges(
+    graph: networkx.MultiGraph, config: dict
+) -> networkx.MultiGraph:
+    line_min = config.get("Min Length for Internal Line")
+    # If node removal is 0 simply return the graph unchanged
+    if line_min <= 0:
+        return graph
+
+    # Continue as normal
+    modifications = []
+    for edgeLoc in graph.edges:
+        edge = graph.edges[edgeLoc]
+        if edge.get("weight") < line_min:
+            # TODO CHECK IF BOTH POINTS ARE INTERNAL AND NOT BEEN DONE BEFORE
+            removal = construct_removal_dict(graph, edge, edgeLoc)
+            modifications.append(removal)
+
+    # Reconstruct new graph
+    consolidatedGraph = reconstruct_network_with_modifications(graph, modifications)
+    return consolidatedGraph
 
 
 def generate_skeleton_from_graph(shape: tuple, graph: networkx.MultiGraph):
@@ -150,11 +229,13 @@ def create_skeleton(segmentation, config):
     skel = pcv.morphology.skeletonize(segmentation)
     skelWidthPruned, skel_width = vessel_width_and_prune(skel, segmentation, config)
     graph = sknw.build_sknw(
-        skelWidthPruned, multi=True, iso=False, ring=True, full=True
+        skelWidthPruned, multi=True, iso=False, ring=False, full=True
     )
     graph = prune_skeleton_spurs_with_graph(graph, config)
-    skelLengthPruned = generate_skeleton_from_graph(np.shape(skel), graph)
-    return skelLengthPruned, skel_width, graph
+    graphFinal = consolidate_internal_graph_edges(graph, config)
+    skelPruned = generate_skeleton_from_graph(np.shape(skel), graphFinal)
+
+    return skelPruned, skel_width, graph
 
 
 def draw_and_save_images(image, segmentation, bp, ep, skel, name, config):
