@@ -111,15 +111,43 @@ def vessel_width_and_prune(skel, segmentation, config: dict):
     return np.uint8(new_skel * 255), skel_width
 
 
-def create_skeleton(segmentation, config):
+def prune_skeleton_with_graph(graph: networkx.Graph, config: dict) -> networkx.Graph:
     line_min = config.get("Min Line Length")
+    edgeRemovalCandidates = []
+    edges = graph.edges
+    for edgeLoc in edges:
+        edge = edges[edgeLoc]
+        if edge.get("weight") < line_min:
+            edgeRemovalCandidates.append(edgeLoc)
+
+    # Remove edges from the graph
+    graph.remove_edges_from(edgeRemovalCandidates)
+    return graph
+
+
+def generate_skeleton_from_graph(shape: tuple, graph: networkx.Graph):
+    skel = np.zeros(shape)
+    # Plot every point on the graph on the new skeleton
+    for u, v, l in graph.edges:
+        ps = graph[u][v][l].get("pts")
+        X = ps[:, 1]
+        Y = ps[:, 0]
+        for i in range(len(X)):
+            skel[Y[i], X[i]] = 255
+
+    return skel
+
+
+def create_skeleton(segmentation, config):
     # Skeletonisation
     skel = pcv.morphology.skeletonize(segmentation)
     skelWidthPruned, skel_width = vessel_width_and_prune(skel, segmentation, config)
-    skelLengthPruned, _, _ = pcv.morphology.prune(
-        skel_img=skelWidthPruned, size=line_min
+    graph = sknw.build_sknw(
+        skelWidthPruned, multi=True, iso=False, ring=True, full=True
     )
-    return skelLengthPruned, skel_width
+    graph = prune_skeleton_with_graph(graph, config)
+    skelLengthPruned = generate_skeleton_from_graph(np.shape(skel), graph)
+    return skelLengthPruned, skel_width, graph
 
 
 def draw_and_save_images(image, segmentation, bp, ep, skel, name, config):
