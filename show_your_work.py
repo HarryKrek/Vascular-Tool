@@ -15,7 +15,7 @@ from vascular_tool import (
 from skimage.morphology import isotropic_erosion, remove_small_objects
 
 # Setup Variables
-image = glob("C:\\Users\\uqhkrek\\Desktop\\reference image\\adjusted.tif")[0]
+image = glob("C:\\Users\\uqhkrek\\Desktop\\reference image\\diaphragm_60x_3.tif")[0]
 configLoc = glob("C:\\Users\\uqhkrek\\Desktop\\reference image\\config.yml")[0]
 saveLoc = glob("C:\\Users\\uqhkrek\\Desktop\\reference image")[0]
 

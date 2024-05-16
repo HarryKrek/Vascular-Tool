@@ -200,11 +200,16 @@ def consolidate_internal_graph_edges(
     # Continue as normal
     modifications = []
     for edgeLoc in graph.edges:
+        u, l, _ = edgeLoc
         edge = graph.edges[edgeLoc]
         if edge.get("weight") < line_min:
-            # TODO CHECK IF BOTH POINTS ARE INTERNAL AND NOT BEEN DONE BEFORE
-            removal = construct_removal_dict(graph, edge, edgeLoc)
-            modifications.append(removal)
+            # TODO CHECK IF BOTH POINTS ARE INTERNAL AND NOT BEEN DONE BEFORE - DONE BEFORE DONNE WITH THE FOR LOOP METHINKS
+            if (
+                sum(1 for _ in graph.neighbors(u)) > 2
+                and sum(1 for _ in graph.neighbors(l)) > 2
+            ):
+                removal = construct_removal_dict(graph, edge, edgeLoc)
+                modifications.append(removal)
 
     # Reconstruct new graph
     consolidatedGraph = reconstruct_network_with_modifications(graph, modifications)
@@ -214,28 +219,32 @@ def consolidate_internal_graph_edges(
 def generate_skeleton_from_graph(shape: tuple, graph: networkx.MultiGraph):
     skel = np.zeros(shape)
     # Plot every point on the graph on the new skeleton
-    for u, v, l in graph.edges:
-        ps = graph[u][v][l].get("pts")
+    for u, v in graph.edges:
+        ps = graph[u][v].get("pts")
         X = ps[:, 1]
         Y = ps[:, 0]
         for i in range(len(X)):
             skel[Y[i], X[i]] = 255
-
+    for node in graph.nodes:
+        ps = graph.nodes[node].get("pts")[0]
+        x = ps[1]
+        y = ps[0]
+        skel[y, x] = 255
     return skel
 
 
 def create_skeleton(segmentation, config):
     # Skeletonisation
-    skel = pcv.morphology.skeletonize(segmentation)
+    skel = skeletonize(segmentation)
     skelWidthPruned, skel_width = vessel_width_and_prune(skel, segmentation, config)
     graph = sknw.build_sknw(
-        skelWidthPruned, multi=True, iso=False, ring=False, full=True
+        skelWidthPruned, multi=False, iso=False, ring=False, full=False
     )
-    graph = prune_skeleton_spurs_with_graph(graph, config)
-    graphFinal = consolidate_internal_graph_edges(graph, config)
+    graphFinal = prune_skeleton_spurs_with_graph(graph, config)
+    # graphFinal = consolidate_internal_graph_edges(graph, config)
     skelPruned = generate_skeleton_from_graph(np.shape(skel), graphFinal)
 
-    return skelPruned, skel_width, graph
+    return skelPruned, skel_width, graphFinal
 
 
 def draw_and_save_images(image, segmentation, bp, ep, skel, name, config):
@@ -313,7 +322,7 @@ def obtain_branch_and_end_points(graph: networkx.MultiGraph):
 def vessel_statistics_from_graph(graph: networkx.MultiGraph):
     totalLen = 0
     for s, e in graph.edges():
-        ps = graph[s][e][0]["weight"]
+        ps = graph[s][e]["weight"]
         totalLen += ps
 
     return totalLen, totalLen / len(graph.edges())
