@@ -7,6 +7,7 @@ import glob
 import pandas as pd
 import skimage
 import numpy as np
+from pathlib import Path
 
 
 VascularImagePath = "./Results/*.tif"
@@ -17,6 +18,7 @@ MyImages = glob.glob(VascularImagePath)
 truthImages = glob.glob(TruthImagePath)
 
 # Do a quick check to make sure that both have the same number of images
+print(f"{len(MyImages)} mine, {len(truthImages)} ground truth")
 if len(MyImages) != len(truthImages):
     raise ValueError("Incorrect number of Images")
 
@@ -46,9 +48,20 @@ for i in range(len(MyImages)):
     sens = TP / (TP + FP)
     spec = TN / (TN + FP)
     # Metrics into dict
-    result = {"accuracy": acc, "sensitivity": sens, "specificity": spec}
+    result = {
+        "name": Path(MyImages[i]).stem,
+        "sensitivity": sens,
+        "specificity": spec,
+        "accuracy": acc,
+    }
     print(result)
     metrics.append(result)
+avgAcc = np.mean([r["accuracy"] for r in metrics])
+avgSens = np.mean([r["sensitivity"] for r in metrics])
+avgSpec = np.mean([r["specificity"] for r in metrics])
+print(f"Mean Acc {avgAcc}, Mean Sens {avgSens}, Mean Spec = {avgSpec}")
 
 
 # Convert metrics to pd Dataframe then csv
+df = pd.DataFrame.from_dict(metrics)
+df.to_csv("./SegmentationAsssessment.csv")

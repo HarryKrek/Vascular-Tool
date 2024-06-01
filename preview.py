@@ -9,6 +9,11 @@ def main(config_path: str, imagePath: str, resultsPath: str) -> None:
     with open(config_path, "r") as file:
         config = yaml.safe_load(file)
 
+    imagePath = config.get("Img Path")
+    savename = config.get("Spreadsheet Output Path")
+    resultsPath = config.get("Results Path")
+    config["Show Image"] = True
+
     full_images = find_images_in_path(imagePath)
     examplePoints = [0, floor((len(full_images) - 1) / 2), -1]
     images = [full_images[0], full_images[examplePoints[1]], full_images[-1]]

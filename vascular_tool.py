@@ -15,23 +15,20 @@ from skimage.filters import gaussian, threshold_local, median
 from skimage.exposure import equalize_adapthist, rescale_intensity
 import numpy as np
 from scipy.ndimage import distance_transform_edt
-from skimage.graph import pixel_graph
-from alive_progress import alive_bar
 import pandas as pd
 from pathlib import Path
-import skan.csr
 import argparse
 import sknw
-import networkx as nx
 import skimage
-import kmeans1d
-import plantcv.plantcv as pcv
 import os
 from multiprocessing import Pool, cpu_count, set_start_method
 import yaml
 import networkx
 from time import time
 from copy import deepcopy
+from pycallgraph import PyCallGraph
+import pycallgraph
+from pycallgraph.output import GraphvizOutput
 
 
 def find_images_in_path(pathdir):
@@ -179,14 +176,23 @@ def reconstruct_network_with_modifications(
             connectedNodes = mod["nodeEdges"][i]
             for node in connectedNodes:
                 if node in oldNode:
+                    # Skip nodes we killed
                     continue
-                oldEdge = oldGraph.edges[(oldNode[i], node)]
+                oldEdge = oldGraph.edges[(oldNode[i], node, 0)]
                 # Create new weights and points
                 newWeight = oldEdge["weight"] + mod["weightAdj"]
                 newPoints = np.append(oldEdge["pts"], mod["pointsArrays"][i], axis=0)
                 # Create new edge
                 newGraph.add_edge(nodeId, node, pts=newPoints, weight=newWeight)
         nodeId += 1
+    # Clean up
+    # This is proof that we need to recheck after each run
+    # Can't be bothered
+    oldGraph = deepcopy(newGraph)
+    for node in oldGraph.nodes:
+        if oldGraph.nodes[node] == {}:
+            newGraph.remove_node(node)
+
     return newGraph
 
 
@@ -201,10 +207,9 @@ def consolidate_internal_graph_edges(
     # Continue as normal
     modifications = []
     for edgeLoc in graph.edges:
-        u, l = edgeLoc
+        u, l, v = edgeLoc
         edge = graph.edges[edgeLoc]
         if edge.get("weight") < line_min:
-            # TODO CHECK IF BOTH POINTS ARE INTERNAL AND NOT BEEN DONE BEFORE - DONE BEFORE DONNE WITH THE FOR LOOP METHINKS
             if (
                 sum(1 for _ in graph.neighbors(u)) > 2
                 and sum(1 for _ in graph.neighbors(l)) > 2
@@ -220,8 +225,8 @@ def consolidate_internal_graph_edges(
 def generate_skeleton_from_graph(shape: tuple, graph: networkx.MultiGraph):
     skel = np.zeros(shape)
     # Plot every point on the graph on the new skeleton
-    for u, v in graph.edges:
-        ps = graph[u][v].get("pts")
+    for u, v, l in graph.edges:
+        ps = graph[u][v][l].get("pts")
         X = ps[:, 1]
         Y = ps[:, 0]
         for i in range(len(X)):
@@ -239,7 +244,7 @@ def create_skeleton(segmentation, config):
     skel = skeletonize(segmentation)
     skelWidthPruned, skel_width = vessel_width_and_prune(skel, segmentation, config)
     graph = sknw.build_sknw(
-        skelWidthPruned, multi=False, iso=False, ring=False, full=True
+        skelWidthPruned, multi=True, iso=False, ring=False, full=True
     )
     graphPruned = prune_skeleton_spurs_with_graph(graph, config)
     graphFinal = consolidate_internal_graph_edges(graphPruned, config)
@@ -253,7 +258,7 @@ def draw_and_save_images(image, segmentation, bp, ep, skel, name, config):
     show = config.get("Show Image")
     if not save and not show:
         pass
-
+    # skimage.io.imsave(name, segmentation)
     # Make an image
     masked = label2rgb(
         label(segmentation * 255),
@@ -267,7 +272,7 @@ def draw_and_save_images(image, segmentation, bp, ep, skel, name, config):
     )
     # Mask skeleton
     maskedSkel = label2rgb(
-        label(isotropic_dilation(skel * 255, 3)),
+        label(isotropic_dilation(skel * 255, 2)),
         image=masked,
         colors=["yellow"],
         kind="overlay",
@@ -283,10 +288,10 @@ def draw_and_save_images(image, segmentation, bp, ep, skel, name, config):
 
     ax.imshow(adjusted)
     plt.scatter(
-        [point[1] for point in bp], [point[0] for point in bp], color="blue", s=20
+        [point[1] for point in bp], [point[0] for point in bp], color="blue", s=50
     )
     plt.scatter(
-        [point[1] for point in ep], [point[0] for point in ep], color="green", s=20
+        [point[1] for point in ep], [point[0] for point in ep], color="green", s=50
     )
     # plt.imshow(skel > 0, alpha=0.8)
     # Save image, not working too well at the moment+
@@ -320,19 +325,21 @@ def obtain_branch_and_end_points(graph: networkx.MultiGraph):
     return (branchPoints, endPoints)
 
 
-def vessel_statistics_from_graph(graph: networkx.MultiGraph):
-    totalLen = 0
-    for s, e in graph.edges():
-        ps = graph[s][e]["weight"]
-        totalLen += ps
+def vessel_statistics_from_graph(graph: networkx.MultiGraph, skel):
+    graphSum = 0
+    for u, v, l in graph.edges:
+        ps = graph.edges[(u, v, l)]["weight"]
+        graphSum += ps
 
-    return totalLen, totalLen / len(graph.edges())
+    totalLen = graphSum  # np.count_nonzero(skel)
+    return totalLen, graphSum / len(graph.edges())
 
 
-def process_image_results(i, segmentation, graph, skel):
+def process_image_results(i, segmentation, graph, skel, widthImage, imgName):
     try:
         results = {}
         results["Num"] = i
+        results["Name"] = imgName
         branchPoints, endPoints = obtain_branch_and_end_points(graph)
         # Get number of cells
         results["Branch Points"] = len(branchPoints)
@@ -344,8 +351,9 @@ def process_image_results(i, segmentation, graph, skel):
         # Percentage Area
         results["percentArea"] = results["vesselArea"] / imgSize * 100
         results["totalVesselLength"], results["avgVesselLength"] = (
-            vessel_statistics_from_graph(graph)
+            vessel_statistics_from_graph(graph, skel)
         )
+        results["Avg Diameter"] = 2 * np.mean(widthImage[widthImage > 0])
         results["Errors"] = ""
     except Exception as e:
         results["Errors"] = str(e)
@@ -360,17 +368,16 @@ def save_results_to_csv(savename, data):
 def worker_process(args):
     try:
         i, image, resultsPath, config = args
+        imgName = Path(image).stem
 
         rgbimg, blurred = import_and_blur_image(image, config)
         segmentation = segment_image(blurred)
         eroded = isotropic_erosion(segmentation, 1)
         cleaned_segmentation = remove_holes_and_small_items(eroded, config)
-        skel, width_im = create_skeleton(cleaned_segmentation, config)
-        graph = sknw.build_sknw(skel, multi=True, iso=False, ring=True, full=True)
+        skel, width_im, graph = create_skeleton(cleaned_segmentation, config)
         img_results, branchPoints, endPoints = process_image_results(
-            i, cleaned_segmentation, graph, skel
+            i, cleaned_segmentation, graph, skel, width_im, imgName
         )
-
         print(img_results)
         draw_and_save_images(
             rgbimg,
@@ -378,7 +385,7 @@ def worker_process(args):
             branchPoints,
             endPoints,
             skel,
-            os.path.abspath(resultsPath + str(i) + ".png"),
+            os.path.abspath(resultsPath + imgName + ".tif"),
             config,
         )
         return img_results
@@ -399,13 +406,15 @@ def main(path: str, savename: str, configPath: str):
     images = find_images_in_path(path)
     results = []  # list of dictionaries
     args = [
-        (i, image, resultsPath, config) for i, image in enumerate(images) if i % 10 == 0
+        (i, image, resultsPath, config) for i, image in enumerate(images) if i % 1 == 0
     ]
-    set_start_method("spawn")
-    with Pool(cpu_count()) as p:
-        results = p.map(worker_process, args)
-        p.close()
-    # print(savename,results)
+
+    # set_start_method("spawn")
+    # with Pool(cpu_count()) as p:
+    #     results = p.map(worker_process, args)
+    #     p.close()
+    for arg in args:
+        results.append(worker_process(arg))
     save_results_to_csv(savename, results)
     elapsed = time() - startTime
     print(f"Completed Processing in {elapsed} seconds")

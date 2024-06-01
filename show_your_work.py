@@ -30,7 +30,7 @@ eroded = isotropic_erosion(segmentation, 1)
 cleaned_segmentation = remove_holes_and_small_items(eroded, config)
 skel, width_im, graph = create_skeleton(cleaned_segmentation, config)
 img_results, branchPoints, endPoints = process_image_results(
-    0, cleaned_segmentation, graph, skel
+    0, cleaned_segmentation, graph, skel, width_im
 )
 
 print(img_results)
