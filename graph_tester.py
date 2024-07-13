@@ -1,39 +1,36 @@
 import networkx as nx
 import matplotlib.pyplot as plt
-import string
+import yaml
+import numpy as np  
 from vascular_tool import consolidate_internal_graph_edges
 
+#Config
+configPath = ".\\config.yml"
+with open(configPath, "r") as file:
+    config = yaml.safe_load(file)
+
 #Create labelled graph
-G = nx.Graph()
+G = nx.MultiGraph()
 
-alphabet = list(string.ascii_uppercase)
-for letter in alphabet:
-    if letter <= 'I':
-        G.add_node(letter)
+i = 0
+while i <= 9:
+    G.add_node(i)
+    i+=1
+
 #Make connections
-G.add_edge('A','C', weight = 3)
-G.add_edge('B','C', weight = 3)
-G.add_edge('C','D',weight = 1)
-G.add_edge('D','E',weight = 1)
-G.add_edge('E','F',weight = 1)
-G.add_edge('D','I', weight = 3)
-G.add_edge('F','G', weight = 3)
-G.add_edge('F','H', weight = 3)
+G.add_edge(1,3, weight = 3, pts = np.array([[1,2]]))
+G.add_edge(2,3, weight = 3, pts = np.array([[1,2]]))
+G.add_edge(3,4,weight = 1, pts = np.array([[1,2],[3,4]]))
+G.add_edge(4,5,weight = 1, pts = np.array([[1,2],[3,4]]))
+G.add_edge(5,6,weight = 1, pts = np.array([[1,2],[3,4]]))
+G.add_edge(9,4, weight = 3, pts = np.array([[1,2]]))
+G.add_edge(7,6, weight = 3, pts = np.array([[1,2]]))
+G.add_edge(8,6, weight = 3, pts = np.array([[1,2]]))
 
 
-pos = nx.spring_layout(G, seed=7)  # positions for all nodes - seed for reproducibility
+G_cleaned = consolidate_internal_graph_edges(G, config)
 
-# nodes
-nx.draw_networkx_nodes(G, pos, node_size=700)
+nx.draw(G_cleaned)
 
-# edges
-nx.draw_networkx_edges(G, pos, width=6)
-
-
-# node labels
-nx.draw_networkx_labels(G, pos, font_size=20, font_family="sans-serif")
-# edge weight labels
-edge_labels = nx.get_edge_attributes(G, "weight")
-nx.draw_networkx_edge_labels(G, pos, edge_labels)
 
 plt.show()

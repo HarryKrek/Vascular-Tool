@@ -23,12 +23,9 @@ import skimage
 import os
 from multiprocessing import Pool, cpu_count, set_start_method
 import yaml
-import networkx
+import networkx as nx
 from time import time
 from copy import deepcopy
-from pycallgraph import PyCallGraph
-import pycallgraph
-from pycallgraph.output import GraphvizOutput
 
 
 def find_images_in_path(pathdir):
@@ -110,8 +107,8 @@ def vessel_width_and_prune(skel, segmentation, config: dict):
 
 
 def prune_skeleton_spurs_with_graph(
-    graph: networkx.MultiGraph, config: dict
-) -> networkx.MultiGraph:
+    graph: nx.MultiGraph, config: dict
+) -> nx.MultiGraph:
     line_min = config.get("Min Spur Line Length")
     nodeRemovalCandidates = []
 
@@ -135,7 +132,7 @@ def prune_skeleton_spurs_with_graph(
     return graph
 
 
-def construct_removal_dict(graph: networkx.MultiGraph, edge: dict, oldNodes: tuple):
+def construct_removal_dict(graph: nx.MultiGraph, edge: dict, oldNodes: tuple):
     outputDict = {}
     # Split the current edge in half
     length = edge["pts"].shape[0]  # Length of Array
@@ -147,7 +144,7 @@ def construct_removal_dict(graph: networkx.MultiGraph, edge: dict, oldNodes: tup
     nodeEdges = []
     gen = (node for node in oldNodes if node != 0)
     for node in gen:
-        nodes = networkx.all_neighbors(graph, node)
+        nodes = nx.all_neighbors(graph, node)
         nodeEdges.append(nodes)
     # Fill out rest of dictionary
     outputDict["nodeEdges"] = nodeEdges
@@ -157,7 +154,7 @@ def construct_removal_dict(graph: networkx.MultiGraph, edge: dict, oldNodes: tup
 
 
 def reconstruct_network_with_modifications(
-    oldGraph: networkx.MultiGraph, modifications: list[dict]
+    oldGraph: nx.MultiGraph, modifications: list[dict]
 ):
     # Copy old graph
 
@@ -195,34 +192,115 @@ def reconstruct_network_with_modifications(
 
     return newGraph
 
+def traverse(graph: nx.MultiGraph, rootNode: int, minLength: int):
+    #Start by acquiring all touching nodes and mark them as touched
+    graph.nodes[rootNode]['touched'] = True
+    edges = []
+
+    for e in graph.edges(rootNode):
+        #Already have first node, want connecting node
+        _, v = e
+        if not graph.nodes[v]['touched']:
+            continue
+
+        if graph.edges[(rootNode, v, 1)]['weight'] < minLength:
+            #Use recursion 
+            edges.append(traverse(graph, v, minLength))
+
+    return edges #list of edges below minLength that are connected
+
+    #Note: We know that each of these are going to be independent of one another. Therefore, we could create a list of these and then combine together to form a larger graph
+
+def find_mean_node_position(G: nx.MultiGraph, nodes: list):
+    xSum = 0
+    ySum = 0
+    for n in nodes:
+        x, y = G.nodes[n]['0']
+        xSum += x
+        ySum += y
+    x = xSum/len(nodes)
+    y = ySum/len(nodes)
+    
+    return x, y
+
+def find_closest_edge_to_position(G: nx.multigraph, meanPos: tuple, edges: list) -> tuple:
+    #takes position, list of edges and a graph and finds the edge whos midpoint is closest
+
+    #Error Handling Checks
+    if len(edges) == 0:
+        raise ValueError("No edges given for find closest edge")
+    if len(meanPos) != 2: 
+        raise ValueError("Incorrect Dimension for 2D position")
+    
+    #Actual Computation
+    closest = None
+    closestDist = np.inf #Any distance is closer than infty
+    xMean, yMean = meanPos
+    for e in edges:
+        #Get edge from graph
+        u,v = e
+        # Get mean position of the nodes
+        # Assume straight line (slightly bad assumption but close enough for the distances upon which we consolidate)
+        x, y = find_mean_node_position(G, [u,v])
+        #Distance
+        dist = np.sqrt((x -  xMean) ^ 2 + (y - yMean) ^ 2)
+        if dist < closestDist:
+            closest = (u,v)
+            closestDist = dist
+
+
+    if closest == None:
+        raise ValueError("Closest edge not found, no edges applied")
+    
+    return closest
+
+def consolidation_subgraph(origGraph: nx.MultiGraph, nodes: list, edges: list):
+    #Find mean position of nodes in our list
+    meanPos = find_mean_node_position(origGraph, nodes)
+
+    #copy graph components
+    
+    running = True
+    while running:
+        #get closest edge
+        u,v = find_closest_edge_to_position(origGraph, meanPos, edges)
+        #Revise Graph
+
+        
+        
 
 def consolidate_internal_graph_edges(
-    graph: networkx.MultiGraph, config: dict
-) -> networkx.MultiGraph:
-    line_min = config.get("Min Length for Internal Line")
-    # If node removal is 0 simply return the graph unchanged
-    if line_min <= 0:
-        return graph
+    graph: nx.MultiGraph, config: dict
+) -> nx.MultiGraph:
+    #min Length
+    minLen = config.get("Min Length for Internal Line")
+    # no nodes have been touched yet
+    for n in graph.nodes():
+        graph.nodes[n]['touch'] = False 
 
-    # Continue as normal
-    modifications = []
-    for edgeLoc in graph.edges:
-        u, l, v = edgeLoc
-        edge = graph.edges[edgeLoc]
-        if edge.get("weight") < line_min:
-            if (
-                sum(1 for _ in graph.neighbors(u)) > 2
-                and sum(1 for _ in graph.neighbors(l)) > 2
-            ):
-                removal = construct_removal_dict(graph, edge, edgeLoc)
-                modifications.append(removal)
 
+    for n in graph.nodes():
+        node = graph.nodes[n]
+        if not node['touch']:
+            continue
+    
+        #node is untouched we can continue by traversing along this node's connections
+        #Mark node as touched
+        graph.nodes[n]['touch'] = False
+        candidateEdges = [for edge in G.edges[n] if edge < minLen]
+        if len(candidateEdges) == 0:
+            continue
+
+        #node has at least one candidate for removal - begin flood search
+        
+
+        
     # Reconstruct new graph
     consolidatedGraph = reconstruct_network_with_modifications(graph, modifications)
     return consolidatedGraph
 
 
-def generate_skeleton_from_graph(shape: tuple, graph: networkx.MultiGraph):
+def generate_skeleton_from_graph(shape: tuple, graph: nx.MultiGraph):
     skel = np.zeros(shape)
     # Plot every point on the graph on the new skeleton
     for u, v, l in graph.edges:
@@ -306,7 +384,7 @@ def draw_and_save_images(image, segmentation, bp, ep, skel, name, config):
         plt.close()
 
 
-def obtain_branch_and_end_points(graph: networkx.MultiGraph):
+def obtain_branch_and_end_points(graph: nx.MultiGraph):
     branchPoints = []
     endPoints = []
 
@@ -325,7 +403,7 @@ def obtain_branch_and_end_points(graph: networkx.MultiGraph):
     return (branchPoints, endPoints)
 
 
-def vessel_statistics_from_graph(graph: networkx.MultiGraph, skel):
+def vessel_statistics_from_graph(graph: nx.MultiGraph, skel):
     graphSum = 0
     for u, v, l in graph.edges:
         ps = graph.edges[(u, v, l)]["weight"]
