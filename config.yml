@@ -7,7 +7,7 @@ Min Object Size: 400 #pixels
 
 # Skeletonisation
 Min Spur Line Length: 50 #pixels
-Min Length for Internal Line: 20 # If length < this number edge's nodes will be merged into one
+Min Length for Internal Line: 30 # If length < this number edge's nodes will be merged into one
 Minimum Vessel Width: 0 #pixels
 
 #Save Results
@@ -15,7 +15,7 @@ Save Image: True
 Show Image: False
 
 #Path and Savename
-Img Path: D://KREK//20230304_075556_96 wel plate_2D co culture_ HAEC P2_ASC52 P8_20230303_4X_TIME LAPSE//Wellc8//F2
+Img Path: "C:\\Users\\harry\\Downloads\\Tester\\"
 Results Path: ./Results/
 Spreadsheet Output Path: .\\17_05_24_create_STATS.csv
 

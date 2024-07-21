@@ -28,6 +28,9 @@ from time import time
 from copy import deepcopy
 
 
+nodeResults = []
+
+
 def find_images_in_path(pathdir):
     path = Path(pathdir)
     images = list(path.glob("*.tif"))
@@ -192,112 +195,179 @@ def reconstruct_network_with_modifications(
 
     return newGraph
 
-def traverse(graph: nx.MultiGraph, rootNode: int, minLength: int):
-    #Start by acquiring all touching nodes and mark them as touched
-    graph.nodes[rootNode]['touched'] = True
-    edges = []
 
-    for e in graph.edges(rootNode):
-        #Already have first node, want connecting node
-        _, v = e
-        if not graph.nodes[v]['touched']:
-            continue
+def flood_find(G: nx.MultiGraph, node: int, minLength: int, root=False):
+    global nodeResults
+    # depth-first search the graph to find all connected nodes
+    returnNodes = []
+    returnEdges = []
 
-        if graph.edges[(rootNode, v, 1)]['weight'] < minLength:
-            #Use recursion 
-            edges.append(traverse(graph, v, minLength))
+    # Add current node to global list
+    G.nodes[node]["touch"] = True
 
-    return edges #list of edges below minLength that are connected
+    # get connected nodes of node
+    edges = [e for e in G.edges(node, keys=True) if G.edges[e]["weight"] < minLength]
+    for edge in edges:
+        # Extract other node from edge
+        # Potential for many downstram nodes
+        downStreamNodes = [
+            n for i, n in enumerate(edge) if n != node and i != 2
+        ]  # Node not equal to this one and not any sort of overlap
+        # Nodes and Edges already added
+        for n in downStreamNodes:
+            if G.nodes[n]["touch"]:
+                continue  # Already added elsewhere
+            else:
+                # Add this edge
+                returnEdges.append(edge)
+                returnNodes.append(n)
+                # Check what's downstream
+                lowerNodes, lowerEdges = flood_find(G, n, minLength)
+                returnEdges += lowerEdges
+                returnNodes += lowerNodes
 
-    #Note: We know that each of these are going to be independent of one another. Therefore, we could create a list of these and then combine together to form a larger graph
+    if len(returnNodes) == 0 and len(returnEdges) > 0:
+        raise (ValueError("Incorrect edges and nodes"))
+    return returnNodes, returnEdges  # NEED TO SEPERATE THESE
+
 
 def find_mean_node_position(G: nx.MultiGraph, nodes: list):
     xSum = 0
     ySum = 0
     for n in nodes:
-        x, y = G.nodes[n]['0']
+        x, y = G.nodes[n]["o"]
         xSum += x
         ySum += y
-    x = xSum/len(nodes)
-    y = ySum/len(nodes)
-    
+    x = xSum / len(nodes)
+    y = ySum / len(nodes)
+
     return x, y
 
-def find_closest_edge_to_position(G: nx.multigraph, meanPos: tuple, edges: list) -> tuple:
-    #takes position, list of edges and a graph and finds the edge whos midpoint is closest
 
-    #Error Handling Checks
+def find_closest_edge_to_position(
+    G: nx.multigraph, meanPos: tuple, edges: list, nodes: list
+) -> tuple:
+    # takes position, list of edges and a graph and finds the edge whos midpoint is closest
+
+    # Error Handling Checks
     if len(edges) == 0:
         raise ValueError("No edges given for find closest edge")
-    if len(meanPos) != 2: 
+    if len(meanPos) != 2:
         raise ValueError("Incorrect Dimension for 2D position")
-    
-    #Actual Computation
+
+    # Actual Computation
     closest = None
-    closestDist = np.inf #Any distance is closer than infty
+    closestDist = np.inf  # Any distance is closer than infty
     xMean, yMean = meanPos
     for e in edges:
-        #Get edge from graph
-        u,v = e
         # Get mean position of the nodes
         # Assume straight line (slightly bad assumption but close enough for the distances upon which we consolidate)
-        x, y = find_mean_node_position(G, [u,v])
-        #Distance
-        dist = np.sqrt((x -  xMean) ^ 2 + (y - yMean) ^ 2)
+        u, v, _ = e
+        x, y = find_mean_node_position(G, [u, v])
+        # Distance
+        dist = np.sqrt((x - xMean) ** 2 + (y - yMean) ** 2)
         if dist < closestDist:
-            closest = (u,v)
+            closest = e
             closestDist = dist
 
-
-    if closest == None:
-        raise ValueError("Closest edge not found, no edges applied")
-    
+    # In the case that no edge is found
+    # Returns None
+    # Calling function should stop action on receipt of this
     return closest
 
-def consolidation_subgraph(origGraph: nx.MultiGraph, nodes: list, edges: list):
-    #Find mean position of nodes in our list
-    meanPos = find_mean_node_position(origGraph, nodes)
-
-    #copy graph components
-    
-    running = True
-    while running:
-        #get closest edge
-        u,v = find_closest_edge_to_position(origGraph, meanPos, edges)
-        #Revise Graph
-
-        
-        
 
 def consolidate_internal_graph_edges(
     graph: nx.MultiGraph, config: dict
 ) -> nx.MultiGraph:
-    #min Length
+    # min Length
     minLen = config.get("Min Length for Internal Line")
     # no nodes have been touched yet
+    # Use this marking for the next step
     for n in graph.nodes():
-        graph.nodes[n]['touch'] = False 
+        graph.nodes[n]["touch"] = False
 
+    # get list of nodes, may change throughout looping due to pruning
+    nodeList = list(graph.nodes()).copy()
+    for n in nodeList:
+        # Remove node from list, continue looping
+        if n not in graph.nodes():
+            continue
 
-    for n in graph.nodes():
         node = graph.nodes[n]
-        if not node['touch']:
-            continue
-    
-        #node is untouched we can continue by traversing along this node's connections
-        #Mark node as touched
-        graph.nodes[n]['touch'] = False
-        candidateEdges = [for edge in G.edges[n] if edge < minLen]
-        if len(candidateEdges) == 0:
+        # Check if node has been touched
+        if node["touch"]:
             continue
 
-        #node has at least one candidate for removal - begin flood search
-        
+        # Node has not been touched, continue
 
-        
-    # Reconstruct new graph
-    consolidatedGraph = reconstruct_network_with_modifications(graph, modifications)
-    return consolidatedGraph
+        # Loop while there exists some edges that are below threshold
+        # Might be worth adding a timeout
+        while True:
+            # Flood fill to find connected nodes wih sub threshold lengths
+            connectedNodes, connectedEdges = flood_find(graph, n, minLen)
+            # Check if there still exists edges that are below threshold in clump
+            if not connectedEdges:
+                break
+
+            # Find COM of clump
+            COM = find_mean_node_position(graph, connectedNodes)
+
+            # Find the edge that will be removed in the clump
+            closestEdge = find_closest_edge_to_position(
+                graph, COM, connectedEdges, connectedNodes
+            )
+            # Get its weight, it will be later added to the connected nodes
+            halfWeight = graph.edges[closestEdge]["weight"]
+
+            # Extract nodes of closest edge, note u will be the remaining node
+            u, v, _ = closestEdge
+            # Determine new position of u
+            # Determine middle entry of path and extract new position
+            edgePath = graph.edges[closestEdge]["pts"]
+
+            # Determine paths that will be added to remaining edges, take from graph edge
+            paths = [edgePath[len(edgePath) // 2 :], edgePath[len(edgePath) // 2]]
+            midPoint = edgePath[len(edgePath) // 2]
+
+            # Determine which edges connect to which node
+            consolidatedEdges = [
+                graph.edges(u, keys=True),
+                [],  # Empty will be remade below
+            ]  # v will reference u after contraction
+            oldEdges = graph.edges(v, keys=True)
+            for old in oldEdges:
+                new = tuple(u if x == v else x for x in old)
+                consolidatedEdges[1].append(new)
+
+            # Combine Nodes, keep graph in place (no copy)
+            nx.contracted_nodes(graph, u, v, self_loops=False, copy=False)
+            # Reconstruct change u node position and edge info to fill missing
+            # New u position
+            graph.nodes[u]["o"] = midPoint
+            # now for the modified edges
+            for i in range(2):
+                nodePath = paths[i]
+                nodeEdges = consolidatedEdges[i]
+
+                # Take v's list and point it at u to get current reference
+
+                for edge in nodeEdges:
+                    # Node will self reference as a result of deleted
+                    if edge[0] == edge[1]:
+                        continue
+                    # Weight
+                    graph.edges[edge]["weight"] = (
+                        graph.edges[edge]["weight"] + halfWeight
+                    )
+                    # Path, order does not matter in the reconstruction process
+                    # Check if only one entry and reshape if it is
+                    if np.shape(nodePath) == (2,):
+                        nodePath = np.array([nodePath])
+                    graph.edges[edge]["pts"] = np.append(
+                        graph.edges[edge]["pts"], nodePath, axis=0
+                    )
+
+    return graph
 
 
 def generate_skeleton_from_graph(shape: tuple, graph: nx.MultiGraph):
