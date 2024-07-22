@@ -218,6 +218,9 @@ def flood_find(G: nx.MultiGraph, node: int, minLength: int, root=False):
             if G.nodes[n]["touch"]:
                 continue  # Already added elsewhere
             else:
+                #Don't consider node if it is an end point
+                if len(G.edges(n)) == 1:
+                    continue
                 # Add this edge
                 returnEdges.append(edge)
                 returnNodes.append(n)
