@@ -218,7 +218,7 @@ def flood_find(G: nx.MultiGraph, node: int, minLength: int, root=False):
             if G.nodes[n]["touch"]:
                 continue  # Already added elsewhere
             else:
-                #Don't consider node if it is an end point
+                # Don't consider node if it is an end point
                 if len(G.edges(n)) == 1:
                     continue
                 # Add this edge
@@ -376,7 +376,7 @@ def consolidate_internal_graph_edges(
 def generate_skeleton_from_graph(shape: tuple, graph: nx.MultiGraph):
     skel = np.zeros(shape)
     # Plot every point on the graph on the new skeleton
-    for e in graph.edges(keys = True):
+    for e in graph.edges(keys=True):
         ps = graph.edges[e].get("pts")
         X = ps[:, 1]
         Y = ps[:, 0]
