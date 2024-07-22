@@ -329,7 +329,7 @@ def consolidate_internal_graph_edges(
             edgePath = graph.edges[closestEdge]["pts"]
 
             # Determine paths that will be added to remaining edges, take from graph edge
-            paths = [edgePath[len(edgePath) // 2 :], edgePath[len(edgePath) // 2]]
+            paths = [edgePath[len(edgePath) // 2 :], edgePath[: len(edgePath) // 2]]
             midPoint = edgePath[len(edgePath) // 2]
 
             # Determine which edges connect to which node
@@ -376,8 +376,8 @@ def consolidate_internal_graph_edges(
 def generate_skeleton_from_graph(shape: tuple, graph: nx.MultiGraph):
     skel = np.zeros(shape)
     # Plot every point on the graph on the new skeleton
-    for u, v, l in graph.edges:
-        ps = graph[u][v][l].get("pts")
+    for e in graph.edges(keys = True):
+        ps = graph.edges[e].get("pts")
         X = ps[:, 1]
         Y = ps[:, 0]
         for i in range(len(X)):
