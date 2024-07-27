@@ -123,10 +123,10 @@ def prune_skeleton_spurs_with_graph(
     edges = graph.edges
     for edgeLoc in edges:
         edge = edges[edgeLoc]
-        if edge.get("weight") < line_min:
+        if np.size(edge.get("pts")) < line_min:
             # Check if nodes are on the edge
             for node in edgeLoc:
-                neighbours = sum(1 for _ in graph.neighbors(node))
+                neighbours = sum(1 for n in graph.neighbors(node) if n in graph.nodes())
                 if neighbours == 1:
                     nodeRemovalCandidates.append(node)
 
@@ -206,7 +206,7 @@ def flood_find(G: nx.MultiGraph, node: int, minLength: int, root=False):
     G.nodes[node]["touch"] = True
 
     # get connected nodes of node
-    edges = [e for e in G.edges(node, keys=True) if G.edges[e]["weight"] < minLength]
+    edges = [e for e in G.edges(node, keys=True) if np.size(G.edges[e].get("pts")) < minLength]
     for edge in edges:
         # Extract other node from edge
         # Potential for many downstram nodes
@@ -397,8 +397,10 @@ def create_skeleton(segmentation, config):
     graph = sknw.build_sknw(
         skelWidthPruned, multi=True, iso=False, ring=False, full=True
     )
+    
     graphPruned = prune_skeleton_spurs_with_graph(graph, config)
-    graphFinal = consolidate_internal_graph_edges(graphPruned, config)
+    goOne = consolidate_internal_graph_edges(graphPruned, config)
+    graphFinal = consolidate_internal_graph_edges(goOne, config)
     skelPruned = generate_skeleton_from_graph(np.shape(skel), graphFinal)
 
     return skelPruned, skel_width, graphFinal
