@@ -206,7 +206,11 @@ def flood_find(G: nx.MultiGraph, node: int, minLength: int, root=False):
     G.nodes[node]["touch"] = True
 
     # get connected nodes of node
-    edges = [e for e in G.edges(node, keys=True) if np.size(G.edges[e].get("pts")) < minLength]
+    edges = [
+        e
+        for e in G.edges(node, keys=True)
+        if np.size(G.edges[e].get("pts")) < minLength
+    ]
     for edge in edges:
         # Extract other node from edge
         # Potential for many downstram nodes
@@ -284,6 +288,8 @@ def consolidate_internal_graph_edges(
 ) -> nx.MultiGraph:
     # min Length
     minLen = config.get("Min Length for Internal Line")
+    if minLen == 0:
+        return graph
     # no nodes have been touched yet
     # Use this marking for the next step
     for n in graph.nodes():
@@ -298,77 +304,89 @@ def consolidate_internal_graph_edges(
 
         node = graph.nodes[n]
         # Check if node has been touched
-        if node["touch"]:
+        if node["touch"] or len(graph.edges(n)) == 1:
             continue
 
         # Node has not been touched, continue
-
-        # Loop while there exists some edges that are below threshold
-        # Might be worth adding a timeout
+        # Loop for checking
         while True:
-            # Flood fill to find connected nodes wih sub threshold lengths
-            connectedNodes, connectedEdges = flood_find(graph, n, minLen)
-            # Check if there still exists edges that are below threshold in clump
-            if not connectedEdges:
+            # Loop while there exists some edges that are below threshold
+            # Might be worth adding a timeout
+            while True:
+                # Flood fill to find connected nodes wih sub threshold lengths
+                connectedNodes, connectedEdges = flood_find(graph, n, minLen)
+                # Check if there still exists edges that are below threshold in clump
+                if not connectedEdges:
+                    break
+
+                # Find COM of clump
+                COM = find_mean_node_position(graph, connectedNodes)
+
+                # Find the edge that will be removed in the clump
+                closestEdge = find_closest_edge_to_position(
+                    graph, COM, connectedEdges, connectedNodes
+                )
+                # Get its weight, it will be later added to the connected nodes
+                halfWeight = graph.edges[closestEdge]["weight"]
+
+                # Extract nodes of closest edge, note u will be the remaining node
+                u, v, _ = closestEdge
+                # Determine new position of u
+                # Determine middle entry of path and extract new position
+                edgePath = graph.edges[closestEdge]["pts"]
+
+                # Determine paths that will be added to remaining edges, take from graph edge
+                paths = [edgePath[len(edgePath) // 2 :], edgePath[: len(edgePath) // 2]]
+                midPoint = edgePath[len(edgePath) // 2]
+
+                # Determine which edges connect to which node
+                consolidatedEdges = [
+                    graph.edges(u, keys=True),
+                    [],  # Empty will be remade below
+                ]  # v will reference u after contraction
+                oldEdges = graph.edges(v, keys=True)
+                for old in oldEdges:
+                    new = tuple(u if x == v else x for x in old)
+                    consolidatedEdges[1].append(new)
+
+                # Combine Nodes, keep graph in place (no copy)
+                nx.contracted_nodes(graph, u, v, self_loops=False, copy=False)
+                # Reconstruct change u node position and edge info to fill missing
+                # New u position
+                graph.nodes[u]["o"] = midPoint
+                # now for the modified edges
+                for j in range(2):
+                    nodePath = paths[j]
+                    nodeEdges = consolidatedEdges[j]
+
+                    # Take v's list and point it at u to get current reference
+
+                    for edge in nodeEdges:
+                        # Node will self reference as a result of deleted
+                        if edge[0] == edge[1]:
+                            continue
+                        # Weight
+                        graph.edges[edge]["weight"] = (
+                            graph.edges[edge]["weight"] + halfWeight
+                        )
+                        # Path, order does not matter in the reconstruction process
+                        # Check if only one entry and reshape if it is
+                        if np.shape(nodePath) == (2,):
+                            nodePath = np.array([nodePath])
+                        graph.edges[edge]["pts"] = np.append(
+                            graph.edges[edge]["pts"], nodePath, axis=0
+                        )
+            # Run through and check that all internal edges haven't been missed
+            cont = True
+            for edge in graph.edges(keys=True):
+                if np.size(graph.edges[edge]["pts"]) < minLen:
+                    # Make sure that the edges are internal
+                    u, v, _ = edge
+                    if len(graph.edges(u)) > 1 and len(graph.edges(v)) > 1:
+                        cont = False
+                        break
+            if not cont:
                 break
-
-            # Find COM of clump
-            COM = find_mean_node_position(graph, connectedNodes)
-
-            # Find the edge that will be removed in the clump
-            closestEdge = find_closest_edge_to_position(
-                graph, COM, connectedEdges, connectedNodes
-            )
-            # Get its weight, it will be later added to the connected nodes
-            halfWeight = graph.edges[closestEdge]["weight"]
-
-            # Extract nodes of closest edge, note u will be the remaining node
-            u, v, _ = closestEdge
-            # Determine new position of u
-            # Determine middle entry of path and extract new position
-            edgePath = graph.edges[closestEdge]["pts"]
-
-            # Determine paths that will be added to remaining edges, take from graph edge
-            paths = [edgePath[len(edgePath) // 2 :], edgePath[: len(edgePath) // 2]]
-            midPoint = edgePath[len(edgePath) // 2]
-
-            # Determine which edges connect to which node
-            consolidatedEdges = [
-                graph.edges(u, keys=True),
-                [],  # Empty will be remade below
-            ]  # v will reference u after contraction
-            oldEdges = graph.edges(v, keys=True)
-            for old in oldEdges:
-                new = tuple(u if x == v else x for x in old)
-                consolidatedEdges[1].append(new)
-
-            # Combine Nodes, keep graph in place (no copy)
-            nx.contracted_nodes(graph, u, v, self_loops=False, copy=False)
-            # Reconstruct change u node position and edge info to fill missing
-            # New u position
-            graph.nodes[u]["o"] = midPoint
-            # now for the modified edges
-            for i in range(2):
-                nodePath = paths[i]
-                nodeEdges = consolidatedEdges[i]
-
-                # Take v's list and point it at u to get current reference
-
-                for edge in nodeEdges:
-                    # Node will self reference as a result of deleted
-                    if edge[0] == edge[1]:
-                        continue
-                    # Weight
-                    graph.edges[edge]["weight"] = (
-                        graph.edges[edge]["weight"] + halfWeight
-                    )
-                    # Path, order does not matter in the reconstruction process
-                    # Check if only one entry and reshape if it is
-                    if np.shape(nodePath) == (2,):
-                        nodePath = np.array([nodePath])
-                    graph.edges[edge]["pts"] = np.append(
-                        graph.edges[edge]["pts"], nodePath, axis=0
-                    )
 
     return graph
 
@@ -395,12 +413,11 @@ def create_skeleton(segmentation, config):
     skel = skeletonize(segmentation)
     skelWidthPruned, skel_width = vessel_width_and_prune(skel, segmentation, config)
     graph = sknw.build_sknw(
-        skelWidthPruned, multi=True, iso=False, ring=False, full=True
+        skelWidthPruned, multi=True, iso=False, ring=True, full=True
     )
-    
+
     graphPruned = prune_skeleton_spurs_with_graph(graph, config)
-    goOne = consolidate_internal_graph_edges(graphPruned, config)
-    graphFinal = consolidate_internal_graph_edges(goOne, config)
+    graphFinal = consolidate_internal_graph_edges(graphPruned, config)
     skelPruned = generate_skeleton_from_graph(np.shape(skel), graphFinal)
 
     return skelPruned, skel_width, graphFinal
@@ -559,15 +576,15 @@ def main(path: str, savename: str, configPath: str):
     images = find_images_in_path(path)
     results = []  # list of dictionaries
     args = [
-        (i, image, resultsPath, config) for i, image in enumerate(images) if i % 1 == 0
+        (i, image, resultsPath, config) for i, image in enumerate(images) if i % 5 == 0
     ]
 
-    # set_start_method("spawn")
-    # with Pool(cpu_count()) as p:
-    #     results = p.map(worker_process, args)
-    #     p.close()
-    for arg in args:
-        results.append(worker_process(arg))
+    set_start_method("spawn")
+    with Pool(cpu_count()) as p:
+        results = p.map(worker_process, args)
+        p.close()
+    # for arg in args:
+    #     results.append(worker_process(arg))
     save_results_to_csv(savename, results)
     elapsed = time() - startTime
     print(f"Completed Processing in {elapsed} seconds")
