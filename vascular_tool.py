@@ -1,6 +1,6 @@
 # TODO clean up whatever tf is going on with my imports, this is getting excessive
 import matplotlib.pyplot as plt
-from skimage import data, io
+from skimage import io
 from skimage.color import rgb2gray, label2rgb
 from skimage.morphology import (
     skeletonize,
@@ -10,8 +10,8 @@ from skimage.morphology import (
     isotropic_erosion,
     disk,
 )
-from skimage.measure import label, regionprops
-from skimage.filters import gaussian, threshold_local, median
+from skimage.measure import label
+from skimage.filters import gaussian, threshold_local
 from skimage.exposure import equalize_adapthist, rescale_intensity
 import numpy as np
 from scipy.ndimage import distance_transform_edt
@@ -19,7 +19,6 @@ import pandas as pd
 from pathlib import Path
 import argparse
 import sknw
-import skimage
 import os
 from multiprocessing import Pool, cpu_count, set_start_method
 import yaml
