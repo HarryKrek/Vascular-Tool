@@ -51,7 +51,7 @@ class App(ctk.CTk):
         self.logo.grid(row=0, column=0, sticky="new", padx=10, pady=10)
 
         #Frame with label and dropdown menu to select single vs multi mode
-        self.selection_frame = ctk.CTkFrame(self.sidebar_frame)
+        self.selection_frame = ctk.CTkFrame(self.sidebar_frame, width=140)
         self.selection_frame.grid(row = 1, column = 0, padx = 10, pady= 10, sticky = 'new')
         self.selection_frame.grid_rowconfigure(1, weight = 1)
         #Fill this with selection
@@ -62,6 +62,15 @@ class App(ctk.CTk):
         self.mode_select = ctk.CTkOptionMenu(self.selection_frame, dynamic_resizing = False,
                                              values = ["Single Image", "Batch Process"])
         self.mode_select.grid(row = 0, column= 1, columnspan =1, padx =10, pady=10, sticky = 'ew')
+
+        #Tabbed Frames for settings
+        self.tabview = ctk.CTkTabview(self.sidebar_frame)
+        self.tabview.grid(row=2, column=0, padx=(20, 0), pady=(20, 0), sticky="nsew")
+        self.tabview.add("Analysis")
+        self.tabview.add("Output Image")
+        self.tabview.add("Batch Analysis")
+        self.tabview.tab("Analysis").grid_columnconfigure(0, weight=1)  # configure grid of individual tabs
+        self.tabview.tab("Output Image").grid_columnconfigure(0, weight=1)
 
         # Place loading bar frame at the bottom
         self.bottom_frame = ctk.CTkFrame(self, corner_radius=3)
@@ -79,7 +88,7 @@ class App(ctk.CTk):
 
         #Image Frame
         #TODO AUTOSCALING FOR IMAGE
-        self.image = ctk.CTkImage(light_image=Image.open('WT_1.tif'), dark_image=Image.open('WT_1.tif'), size=(1200,1200))
+        self.image = ctk.CTkImage(light_image=Image.open('WT_1.tif'), dark_image=Image.open('WT_1.tif'), size=(600,600))
         self.imageFrame = ctk.CTkLabel(self, text='', image = self.image)
         self.imageFrame.grid(row =0, column =1, padx = 20, pady = 20, sticky = 'nsew')
 
