@@ -1,4 +1,9 @@
 import customtkinter as ctk
+from PIL import Image
+
+class SettingFrame(ctk.CTkScrollableFrame):
+    def __init__(self, master):
+        super().__init__(master)
 
 
 class MyScrollableCheckboxFrame(ctk.CTkScrollableFrame):
@@ -42,14 +47,44 @@ class App(ctk.CTk):
 
         # Place Items in Sidebar Frame
         # Firstly BRAT Frame
-        self.logo = ctk.CTkLabel(self, width=120, height=120, corner_radius=1, text="BRAT", font=ctk.CTkFont(size=20, weight="bold"))
+        self.logo = ctk.CTkLabel(self.sidebar_frame, width=100, height=60, corner_radius=5, text="BRAT", font=ctk.CTkFont(size=20, weight="bold"))
         self.logo.grid(row=0, column=0, sticky="new", padx=10, pady=10)
+
+        #Frame with label and dropdown menu to select single vs multi mode
+        self.selection_frame = ctk.CTkFrame(self.sidebar_frame)
+        self.selection_frame.grid(row = 1, column = 0, padx = 10, pady= 10, sticky = 'new')
+        self.selection_frame.grid_rowconfigure(1, weight = 1)
+        #Fill this with selection
+        #MODE Label
+        temp =ctk.CTkLabel(self.selection_frame, text = "Selection Mode", font=ctk.CTkFont(size=20, weight="bold"))
+        temp.grid(row=0, column = 0, columnspan = 1, sticky = 'ew')
+        #
+        self.mode_select = ctk.CTkOptionMenu(self.selection_frame, dynamic_resizing = False,
+                                             values = ["Single Image", "Batch Process"])
+        self.mode_select.grid(row = 0, column= 1, columnspan =1, padx =10, pady=10, sticky = 'ew')
 
         # Place loading bar frame at the bottom
         self.bottom_frame = ctk.CTkFrame(self, corner_radius=3)
         self.bottom_frame.grid(row=2, column=0, columnspan=2, sticky="ew")  # Spanning across both columns
         self.bottom_frame.grid_columnconfigure(0, weight=1)  # Adjusted configuration
+        #Go Button
+        self.run_button = ctk.CTkButton(self.bottom_frame)
+        self.run_button.grid(row=0,column = 2, sticky = 'nsw')
+        self.run_button.grid_columnconfigure(2,weight=1)
+        #Loading Bar
+        self.load_bar = ctk.CTkProgressBar(self.bottom_frame)
+        self.load_bar.grid(row = 0, column = 0, sticky = 'nsew')
+        self.load_bar.grid_columnconfigure(0,weight=1)
 
+
+        #Image Frame
+        #TODO AUTOSCALING FOR IMAGE
+        self.image = ctk.CTkImage(light_image=Image.open('WT_1.tif'), dark_image=Image.open('WT_1.tif'), size=(1200,1200))
+        self.imageFrame = ctk.CTkLabel(self, text='', image = self.image)
+        self.imageFrame.grid(row =0, column =1, padx = 20, pady = 20, sticky = 'nsew')
+
+
+        
 
 
 if __name__ == '__main__':
