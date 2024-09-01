@@ -41,27 +41,36 @@ class App(ctk.CTk):
         self.grid_rowconfigure(2, weight=0)  # Added a new row for the bottom frame
         
         # Create sidebar Frame
-        self.sidebar_frame = ctk.CTkFrame(self, width=140, corner_radius=3)
-        self.sidebar_frame.grid(row=0, column=0, rowspan=3, sticky="nsew")
-        self.sidebar_frame.grid_rowconfigure(3, weight=1)
+        self.sidebar_frame = ctk.CTkFrame(self, width=140, height= 1000, corner_radius=3)
+        self.sidebar_frame.grid(row=0, column=0, rowspan=4, sticky="nsew")
+        self.sidebar_frame.grid_rowconfigure(0, weight=1)
+        self.sidebar_frame.grid_columnconfigure(0, weight =1)
+        self.sidebar_frame.grid_rowconfigure(2, weight =3 )
 
         # Place Items in Sidebar Frame
         # Firstly BRAT Frame
         self.logo = ctk.CTkLabel(self.sidebar_frame, width=100, height=60, corner_radius=5, text="BRAT", font=ctk.CTkFont(size=20, weight="bold"))
-        self.logo.grid(row=0, column=0, sticky="new", padx=10, pady=10)
+        self.logo.grid(row=0, column=0, sticky="new", columnspan = 1, rowspan = 1, padx=10, pady=10)
 
-        #Frame with label and dropdown menu to select single vs multi mode
-        self.selection_frame = ctk.CTkFrame(self.sidebar_frame)
-        self.selection_frame.grid(row = 1, column = 0, padx = 10, pady= 10, sticky = 'new')
-        self.selection_frame.grid_rowconfigure(1, weight = 1)
+
+        
         #Fill this with selection
         #MODE Label
-        temp =ctk.CTkLabel(self.selection_frame, text = "Selection Mode", font=ctk.CTkFont(size=20, weight="bold"))
-        temp.grid(row=0, column = 0, columnspan = 1, sticky = 'ew')
+        self.modeLabel =ctk.CTkLabel(self.sidebar_frame, text = "Selection Mode", font=ctk.CTkFont(size=20, weight="bold"))
+        self.modeLabel.grid(row=1, column = 0, columnspan = 1, sticky = 'ew')
         #
-        self.mode_select = ctk.CTkOptionMenu(self.selection_frame, dynamic_resizing = False,
+        self.mode_select = ctk.CTkOptionMenu(self.sidebar_frame, dynamic_resizing = False,
                                              values = ["Single Image", "Batch Process"])
-        self.mode_select.grid(row = 0, column= 1, columnspan =1, padx =10, pady=10, sticky = 'ew')
+        self.mode_select.grid(row = 1, column= 1, columnspan =1, padx =10, pady=10, sticky = 'new')
+
+
+        #Add tab selections
+        self.tab_select = ctk.CTkTabview(self.sidebar_frame)
+        self.tab_select.grid(row=2, column =0, sticky = 'nsew', columnspan = 2, rowspan = 2)
+        self.tab_select.add("Analysis")
+        self.tab_select.add("Processing")
+        self.tab_select.set("Analysis")
+        
 
         # Place loading bar frame at the bottom
         self.bottom_frame = ctk.CTkFrame(self, corner_radius=3)
