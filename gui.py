@@ -41,17 +41,19 @@ class App(ctk.CTk):
         self.grid_rowconfigure(2, weight=0)  # Added a new row for the bottom frame
         
         # Create sidebar Frame
-        self.sidebar_frame = ctk.CTkFrame(self, width=140, height= 1000, corner_radius=3)
-        self.sidebar_frame.grid(row=0, column=0, rowspan=4, sticky="nsew")
+        self.sidebar_frame = ctk.CTkFrame(self, width=200, height= 1000, corner_radius=3)
+        self.sidebar_frame.grid(row=0, column=0, rowspan=4, columnspan = 1, sticky="nsew")
         self.sidebar_frame.grid_rowconfigure(0, weight=1)
         self.sidebar_frame.grid_columnconfigure(0, weight =1)
         self.sidebar_frame.grid_rowconfigure(2, weight =3 )
 
         # Place Items in Sidebar Frame
-        # Firstly BRAT Frame
-        self.logo = ctk.CTkLabel(self.sidebar_frame, width=100, height=60, corner_radius=5, text="BRAT", font=ctk.CTkFont(size=20, weight="bold"))
-        self.logo.grid(row=0, column=0, sticky="new", columnspan = 1, rowspan = 1, padx=10, pady=10)
-
+        # Buttons for selection of settings and images
+        self.image_select = ctk.CTkButton(self.sidebar_frame, text = "Choose Image", corner_radius = 3)
+        self.image_select.grid(row = 0, column = 0, padx = 10, pady = 10, sticky = 'nsew')
+        #Image selection button
+        self.settings_select = ctk.CTkButton(self.sidebar_frame, text = "Settings File", corner_radius=3)
+        self.settings_select.grid(row = 0, column = 1, padx = 10, pady = 10, sticky = 'nsew')
 
         
         #Fill this with selection
@@ -66,10 +68,17 @@ class App(ctk.CTk):
 
         #Add tab selections
         self.tab_select = ctk.CTkTabview(self.sidebar_frame)
-        self.tab_select.grid(row=2, column =0, sticky = 'nsew', columnspan = 2, rowspan = 2)
+        self.tab_select.grid(row=2, column =0, sticky = 'nsew', columnspan = 3, rowspan = 2)
         self.tab_select.add("Analysis")
         self.tab_select.add("Processing")
         self.tab_select.set("Analysis")
+        self.tab_select.grid_columnconfigure(0, weight=1)
+        self.tab_select.grid_rowconfigure(0, weight=1)
+
+        #Add settings to the analysis tab
+        self.analysis_scroll = ctk.CTkScrollableFrame(self.tab_select.tab("Analysis"))
+        self.analysis_scroll.pack(fill = 'both')
+
         
 
         # Place loading bar frame at the bottom
