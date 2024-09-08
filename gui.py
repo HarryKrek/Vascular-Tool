@@ -43,32 +43,33 @@ class App(ctk.CTk):
         # Create sidebar Frame
         self.sidebar_frame = ctk.CTkFrame(self, width=200, height= 1000, corner_radius=3)
         self.sidebar_frame.grid(row=0, column=0, rowspan=4, columnspan = 1, sticky="nsew")
-        self.sidebar_frame.grid_rowconfigure(0, weight=1)
         self.sidebar_frame.grid_columnconfigure(0, weight =1)
-        self.sidebar_frame.grid_rowconfigure(2, weight =3 )
+        self.sidebar_frame.grid_rowconfigure(2, weight = 5 )
 
         # Place Items in Sidebar Frame
         # Buttons for selection of settings and images
-        self.image_select = ctk.CTkButton(self.sidebar_frame, text = "Choose Image", corner_radius = 3)
-        self.image_select.grid(row = 0, column = 0, padx = 10, pady = 10, sticky = 'nsew')
+        self.image_select = ctk.CTkButton(self.sidebar_frame, text = "Choose Image", corner_radius = 3, height = 100)
+        self.image_select.grid(row = 0, column = 0, padx = 10, pady = 10, sticky = 'ew')
         #Image selection button
-        self.settings_select = ctk.CTkButton(self.sidebar_frame, text = "Settings File", corner_radius=3)
-        self.settings_select.grid(row = 0, column = 1, padx = 10, pady = 10, sticky = 'nsew')
+        self.settings_select = ctk.CTkButton(self.sidebar_frame, text = "Settings File", corner_radius=3, height = 100)
+        self.settings_select.grid(row = 0, column = 1, padx = 10, pady = 10, sticky = 'ew')
 
         
         #Fill this with selection
         #MODE Label
-        self.modeLabel =ctk.CTkLabel(self.sidebar_frame, text = "Selection Mode", font=ctk.CTkFont(size=20, weight="bold"))
-        self.modeLabel.grid(row=1, column = 0, columnspan = 1, sticky = 'ew')
-        #
         self.mode_select = ctk.CTkOptionMenu(self.sidebar_frame, dynamic_resizing = False,
                                              values = ["Single Image", "Batch Process"])
-        self.mode_select.grid(row = 1, column= 1, columnspan =1, padx =10, pady=10, sticky = 'new')
+        self.mode_select.grid(row = 1, column= 0, columnspan =2, padx =10, pady=10, sticky = 'new')
 
+        #Save/Load Settings
+        self.save_button = ctk.CTkButton(self.sidebar_frame, text= 'Save Settings')
+        self.save_button.grid(row = 2, column = 0, sticky = 'new', padx = 10, pady = 10, columnspan = 2)
+        self.load_button = ctk.CTkButton(self.sidebar_frame, text = 'Load Settings')
+        self.load_button.grid(row = 3, column = 0, sticky = 'new', padx = 10, pady = 10, columnspan = 2)
 
         #Add tab selections
-        self.tab_select = ctk.CTkTabview(self.sidebar_frame)
-        self.tab_select.grid(row=2, column =0, sticky = 'nsew', columnspan = 3, rowspan = 2)
+        self.tab_select = ctk.CTkTabview(self.sidebar_frame, height = 400)
+        self.tab_select.grid(row=4, column = 0, sticky = 'nsew', columnspan = 2, rowspan = 2)
         self.tab_select.add("Analysis")
         self.tab_select.add("Processing")
         self.tab_select.set("Analysis")
@@ -77,7 +78,23 @@ class App(ctk.CTk):
 
         #Add settings to the analysis tab
         self.analysis_scroll = ctk.CTkScrollableFrame(self.tab_select.tab("Analysis"))
-        self.analysis_scroll.pack(fill = 'both')
+        self.analysis_scroll.pack(side ='bottom', fill = 'both', expand = 'true', padx = 0, pady= 0)
+        #Setup the rows and columns for this
+        self.analysis_scroll.grid_columnconfigure(0, weight = 2)
+        self.analysis_scroll.grid_columnconfigure(1, weight= 1)
+        self.analysis_scroll.grid_rowconfigure(0, weight=1)
+
+        # Add Settings to the
+        analysisSettings = ['Blur Sigma', 'Min Hole Size', 'Min Object Size', 'Min Spur Line Length', 
+                            'Min Length for internal Line', 'Min Vessel Width']
+        self.entries = []
+        for i, setting in enumerate(analysisSettings):
+            textTemp = ctk.CTkLabel(self.analysis_scroll, text = setting)
+            textTemp.grid(row = i, column = 0, padx = 10, pady = 10, sticky = 'ew')
+            entry = ctk.CTkEntry(self.analysis_scroll)
+            entry.grid(row = i, column = 1, padx = 10, pady = 10, sticky = 'ew')
+            
+
 
         
 
@@ -97,7 +114,7 @@ class App(ctk.CTk):
 
         #Image Frame
         #TODO AUTOSCALING FOR IMAGE
-        self.image = ctk.CTkImage(light_image=Image.open('WT_1.tif'), dark_image=Image.open('WT_1.tif'), size=(1200,1200))
+        self.image = ctk.CTkImage(light_image=Image.open('WT_1.tif'), dark_image=Image.open('WT_1.tif'), size=(800,800))
         self.imageFrame = ctk.CTkLabel(self, text='', image = self.image)
         self.imageFrame.grid(row =0, column =1, padx = 20, pady = 20, sticky = 'nsew')
 
