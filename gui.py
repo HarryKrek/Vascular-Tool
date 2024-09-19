@@ -1,5 +1,6 @@
 import customtkinter as ctk
 from PIL import Image
+from pathlib import Path
 
 class SettingFrame(ctk.CTkScrollableFrame):
     def __init__(self, master):
@@ -30,10 +31,12 @@ class App(ctk.CTk):
     def __init__(self):
         # Initiate super
         super().__init__()
+        
             
         # Create Grid
         self.title("BRAT -  Vascular Image Analysis")
-        self.geometry(f"{1100}x{580}")
+        self.geometry(f"{1500}x{680}")
+        self.minsize(1500, 680)
         self.grid_columnconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=2)
         self.grid_rowconfigure(0, weight=1)
@@ -48,10 +51,10 @@ class App(ctk.CTk):
 
         # Place Items in Sidebar Frame
         # Buttons for selection of settings and images
-        self.image_select = ctk.CTkButton(self.sidebar_frame, text = "Choose Image", corner_radius = 3, height = 100)
+        self.image_select = ctk.CTkButton(self.sidebar_frame, text = "Choose Image", corner_radius = 3, height = 100, command = self.image_callback)
         self.image_select.grid(row = 0, column = 0, padx = 10, pady = 10, sticky = 'ew')
         #Image selection button
-        self.settings_select = ctk.CTkButton(self.sidebar_frame, text = "Settings File", corner_radius=3, height = 100)
+        self.settings_select = ctk.CTkButton(self.sidebar_frame, text = "Settings File", corner_radius=3, height = 100, command = self.settings_callback)
         self.settings_select.grid(row = 0, column = 1, padx = 10, pady = 10, sticky = 'ew')
 
         
@@ -72,6 +75,7 @@ class App(ctk.CTk):
         self.tab_select.grid(row=4, column = 0, sticky = 'nsew', columnspan = 2, rowspan = 2)
         self.tab_select.add("Analysis")
         self.tab_select.add("Processing")
+        self.tab_select.add("Log")
         self.tab_select.set("Analysis")
         self.tab_select.grid_columnconfigure(0, weight=1)
         self.tab_select.grid_rowconfigure(0, weight=1)
@@ -93,17 +97,13 @@ class App(ctk.CTk):
             textTemp.grid(row = i, column = 0, padx = 10, pady = 10, sticky = 'ew')
             entry = ctk.CTkEntry(self.analysis_scroll)
             entry.grid(row = i, column = 1, padx = 10, pady = 10, sticky = 'ew')
-            
-
-
-        
 
         # Place loading bar frame at the bottom
         self.bottom_frame = ctk.CTkFrame(self, corner_radius=3)
         self.bottom_frame.grid(row=2, column=0, columnspan=2, sticky="ew")  # Spanning across both columns
         self.bottom_frame.grid_columnconfigure(0, weight=1)  # Adjusted configuration
         #Go Button
-        self.run_button = ctk.CTkButton(self.bottom_frame)
+        self.run_button = ctk.CTkButton(self.bottom_frame, text = "Run")
         self.run_button.grid(row=0,column = 2, sticky = 'nsw')
         self.run_button.grid_columnconfigure(2,weight=1)
         #Loading Bar
@@ -113,11 +113,35 @@ class App(ctk.CTk):
 
 
         #Image Frame
-        #TODO AUTOSCALING FOR IMAGE
-        self.image = ctk.CTkImage(light_image=Image.open('WT_1.tif'), dark_image=Image.open('WT_1.tif'), size=(800,800))
+        self.image = None
         self.imageFrame = ctk.CTkLabel(self, text='', image = self.image)
         self.imageFrame.grid(row =0, column =1, padx = 20, pady = 20, sticky = 'nsew')
 
+        self.setup_variables()
+
+    def setup_variables(self):
+        self.imgPath = None
+        self.settingsPath = None
+        self.batch = False
+
+
+    def settings_callback(self):
+        self.settingsPath = ctk.filedialog.askopenfilenames(initialdir="./", title="Select Settings File", filetypes=(("YAML Files",
+                                                        "*.y?ml*"),
+                                                       ("All Files",
+                                                        "*.*")))
+        
+    def image_callback(self):
+        self.imgPath = ctk.filedialog.askopenfilenames(initialdir="./", title="Select Settings File", filetypes=(
+            ("Image Files", '*.jpg;*.png;*.gif;*.bmp;*.tif;*.tiff'), ("All Files", '*')))[0]
+        
+        #Update Image
+        self.image = ctk.CTkImage(light_image=Image.open(self.imgPath), dark_image=Image.open('WT_1.tif'), size=(800,800))
+        self.imageFrame.configure(image = self.image)
+    
+
+    def run_tool(self):
+        pass
 
         
 
