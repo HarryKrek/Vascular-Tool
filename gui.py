@@ -2,6 +2,9 @@ import customtkinter as ctk
 from PIL import Image
 from pathlib import Path
 
+#Import components from vascular tool
+# from vascular_tool import
+
 class SettingFrame(ctk.CTkScrollableFrame):
     def __init__(self, master):
         super().__init__(master)
@@ -31,8 +34,8 @@ class App(ctk.CTk):
     def __init__(self):
         # Initiate super
         super().__init__()
-        
-            
+
+
         # Create Grid
         self.title("BRAT -  Vascular Image Analysis")
         self.geometry(f"{1500}x{680}")
@@ -42,7 +45,7 @@ class App(ctk.CTk):
         self.grid_rowconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
         self.grid_rowconfigure(2, weight=0)  # Added a new row for the bottom frame
-        
+
         # Create sidebar Frame
         self.sidebar_frame = ctk.CTkFrame(self, width=200, height= 1000, corner_radius=3)
         self.sidebar_frame.grid(row=0, column=0, rowspan=4, columnspan = 1, sticky="nsew")
@@ -57,11 +60,12 @@ class App(ctk.CTk):
         self.settings_select = ctk.CTkButton(self.sidebar_frame, text = "Settings File", corner_radius=3, height = 100, command = self.settings_callback)
         self.settings_select.grid(row = 0, column = 1, padx = 10, pady = 10, sticky = 'ew')
 
-        
+
         #Fill this with selection
         #MODE Label
         self.mode_select = ctk.CTkOptionMenu(self.sidebar_frame, dynamic_resizing = False,
-                                             values = ["Single Image", "Batch Process"])
+                                             values = ["Single Image", "Batch Process"], 
+                                             command = self.mode_select())
         self.mode_select.grid(row = 1, column= 0, columnspan =2, padx =10, pady=10, sticky = 'new')
 
         #Save/Load Settings
@@ -89,7 +93,7 @@ class App(ctk.CTk):
         self.analysis_scroll.grid_rowconfigure(0, weight=1)
 
         # Add Settings to the
-        analysisSettings = ['Blur Sigma', 'Min Hole Size', 'Min Object Size', 'Min Spur Line Length', 
+        analysisSettings = ['Blur Sigma', 'Min Hole Size', 'Min Object Size', 'Min Spur Line Length',
                             'Min Length for internal Line', 'Min Vessel Width']
         self.entries = []
         for i, setting in enumerate(analysisSettings):
@@ -119,6 +123,13 @@ class App(ctk.CTk):
 
         self.setup_variables()
 
+    def mode_select(self, mode):
+        #TODO SETUP CHANGE IN VIEW WHEN DOING BATCH SETUP
+        if mode == 'Batch Process':
+            self.batch = True
+        else:
+            self.batch = False
+
     def setup_variables(self):
         self.imgPath = None
         self.settingsPath = None
@@ -130,20 +141,27 @@ class App(ctk.CTk):
                                                         "*.y?ml*"),
                                                        ("All Files",
                                                         "*.*")))
-        
+
     def image_callback(self):
+        # if self.mode_selec
         self.imgPath = ctk.filedialog.askopenfilenames(initialdir="./", title="Select Settings File", filetypes=(
             ("Image Files", '*.jpg;*.png;*.gif;*.bmp;*.tif;*.tiff'), ("All Files", '*')))[0]
-        
+
         #Update Image
         self.image = ctk.CTkImage(light_image=Image.open(self.imgPath), dark_image=Image.open('WT_1.tif'), size=(800,800))
         self.imageFrame.configure(image = self.image)
-    
 
-    def run_tool(self):
+
+    def load_settings(self):
         pass
 
-        
+    def save_settings(self):
+        pass
+
+    def run_tool_single(self):
+        pass
+
+
 
 
 if __name__ == '__main__':
