@@ -65,7 +65,7 @@ class App(ctk.CTk):
         #MODE Label
         self.mode_select = ctk.CTkOptionMenu(self.sidebar_frame, dynamic_resizing = False,
                                              values = ["Single Image", "Batch Process"], 
-                                             command = self.mode_select())
+                                             command = self.mode_selection)
         self.mode_select.grid(row = 1, column= 0, columnspan =2, padx =10, pady=10, sticky = 'new')
 
         #Save/Load Settings
@@ -123,7 +123,7 @@ class App(ctk.CTk):
 
         self.setup_variables()
 
-    def mode_select(self, mode):
+    def mode_selection(self, mode):
         #TODO SETUP CHANGE IN VIEW WHEN DOING BATCH SETUP
         if mode == 'Batch Process':
             self.batch = True
