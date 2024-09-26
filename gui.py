@@ -1,9 +1,15 @@
 import customtkinter as ctk
 from PIL import Image
 from pathlib import Path
+import yaml
+
+analysisSettings = ['Blur Sigma', 'Min Hole Size', 'Min Object Size', 'Min Spur Line Length',
+                            'Min Length for internal Line', 'Min Vessel Width']
+saveAndDisplaySettings = ['Save Image', 'Show Image']
+
 
 #Import components from vascular tool
-# from vascular_tool import
+from vascular_tool import run_img, run_batch
 
 class SettingFrame(ctk.CTkScrollableFrame):
     def __init__(self, master):
@@ -29,6 +35,20 @@ class MyScrollableCheckboxFrame(ctk.CTkScrollableFrame):
                 checked_checkboxes.append(checkbox.cget("text"))
         return checked_checkboxes
 
+
+class FailurePopup(ctk.CTkToplevel):
+    def __init__(self, parent, message):
+        super().__init__(parent)
+        self.title("Exception")
+        self.geometry("300x150")
+
+        # Create a label to display the message
+        lbl_message = ctk.CTkLabel(self, text=message)
+        lbl_message.pack(padx=20, pady=20)
+
+        # Create a dismiss button
+        btn_dismiss = ctk.CTkButton(self, text="Dismiss", command=self.destroy)
+        btn_dismiss.pack()
 
 class App(ctk.CTk):
     def __init__(self):
@@ -71,7 +91,7 @@ class App(ctk.CTk):
         #Save/Load Settings
         self.save_button = ctk.CTkButton(self.sidebar_frame, text= 'Save Settings')
         self.save_button.grid(row = 2, column = 0, sticky = 'new', padx = 10, pady = 10, columnspan = 2)
-        self.load_button = ctk.CTkButton(self.sidebar_frame, text = 'Load Settings')
+        self.load_button = ctk.CTkButton(self.sidebar_frame, text = 'Load Settings', command=self.load_settings)
         self.load_button.grid(row = 3, column = 0, sticky = 'new', padx = 10, pady = 10, columnspan = 2)
 
         #Add tab selections
@@ -92,15 +112,33 @@ class App(ctk.CTk):
         self.analysis_scroll.grid_columnconfigure(1, weight= 1)
         self.analysis_scroll.grid_rowconfigure(0, weight=1)
 
-        # Add Settings to the
-        analysisSettings = ['Blur Sigma', 'Min Hole Size', 'Min Object Size', 'Min Spur Line Length',
-                            'Min Length for internal Line', 'Min Vessel Width']
-        self.entries = []
+        # Add Settings to the grid
+        self.entries = {}
         for i, setting in enumerate(analysisSettings):
             textTemp = ctk.CTkLabel(self.analysis_scroll, text = setting)
             textTemp.grid(row = i, column = 0, padx = 10, pady = 10, sticky = 'ew')
             entry = ctk.CTkEntry(self.analysis_scroll)
             entry.grid(row = i, column = 1, padx = 10, pady = 10, sticky = 'ew')
+            self.entries[setting] = entry
+
+        #Setup processing area
+        self.processing_scroll = ctk.CTkScrollableFrame(self.tab_select.tab("Processing"))
+        self.processing_scroll.pack(side = 'bottom', fill = 'both', expand = True, padx =0, pady = 0)
+        self.processing_scroll.grid_columnconfigure(0, weight = 2)
+        self.processing_scroll.grid_columnconfigure(1, weight= 1)
+        self.processing_scroll.grid_rowconfigure(0, weight=1)
+        
+        #Add processing settings to grid
+        for i, setting in enumerate(saveAndDisplaySettings):
+            textTemp = ctk.CTkLabel(self.processing_scroll, text = setting)
+            textTemp.grid(row = i, column = 0, padx = 10, pady = 10, sticky = 'ew')
+            entry = ctk.CTkCheckBox(self.processing_scroll, text="")
+            entry.grid(row = i, column = 1, padx = 10, pady = 10, sticky = 'ew')
+            self.entries[setting] = entry
+
+        #Log box
+        self.logBox = ctk.CTkTextbox(self.tab_select.tab("Log"))
+        self.logBox.pack(side = 'bottom', fill = 'both', expand = True, padx= 0, pady = 0)
 
         # Place loading bar frame at the bottom
         self.bottom_frame = ctk.CTkFrame(self, corner_radius=3)
@@ -152,14 +190,68 @@ class App(ctk.CTk):
         self.imageFrame.configure(image = self.image)
 
 
+
+    def config_from_box(self):
+        self.config = {}
+        #Extract
+        for key in (analysisSettings + saveAndDisplaySettings):
+            self.config[key] = self.entries[key].get()
+        
+
     def load_settings(self):
-        pass
+        #Load Settings
+        try:
+            #Clear config and settings inputs
+            self.config = {}
+            for key in (analysisSettings + saveAndDisplaySettings):
+                self.entries[key].delete(0, -1)
+
+            self.settings_path = Path(ctk.filedialog.askopenfilenames(initialdir="./", title="Select Settings File", filetypes=(
+                ("yaml", '*.yml;*.yaml'), ("All Files", '*')))[0])
+        
+            #Load settings from yaml file
+            config_loaded = yaml.safe_load(self.settings_path)
+            #Load in the settings from the yaml
+
+            for key in (analysisSettings + saveAndDisplaySettings):
+                #Add to new config
+                self.config[key] = config_loaded[key]
+                #Set entry
+                self.entries[key].set(config_loaded[key])
+        except Exception as e:
+            #Pop up with exception if failiure
+            FailurePopup(self, str(e))
+        
 
     def save_settings(self):
         pass
+        #create dictionary from settings already available
+
+        #Save dictionary with popup
+
+    def run_button_callback(self):
+        #Pull settings from dialogue boxes
+
+        #Run Relevant process
+        if self.batch:
+            self.run_tool_batch()
+        else:
+            self.run_tool_single()
+
+    def run_tool_batch(self):
+        pass
 
     def run_tool_single(self):
-        pass
+        try:
+            if self.image == None:
+                #Raise Error
+                raise ValueError("No Image Loaded")
+            if self.config == None:
+                raise ValueError("No Config Loaded")
+
+            run_img(self.image, self.resultsPath, self.config, self.save_name, 0)
+        except Exception as e:
+            FailurePopup(self, str(e))
 
 
 
