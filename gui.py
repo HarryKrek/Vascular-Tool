@@ -4,7 +4,7 @@ from pathlib import Path
 import yaml
 
 analysisSettings = ['Blur Sigma', 'Min Hole Size', 'Min Object Size', 'Min Spur Line Length',
-                            'Min Length for internal Line', 'Min Vessel Width']
+                            'Min Length for Internal Line', 'Minimum Vessel Width']
 saveAndDisplaySettings = ['Save Image', 'Show Image']
 
 
@@ -204,20 +204,28 @@ class App(ctk.CTk):
             #Clear config and settings inputs
             self.config = {}
             for key in (analysisSettings + saveAndDisplaySettings):
-                self.entries[key].delete(0, -1)
+                if type(self.entries[key]) == ctk.CTkEntry:
+                    self.entries[key].delete(0, -1)
 
             self.settings_path = Path(ctk.filedialog.askopenfilenames(initialdir="./", title="Select Settings File", filetypes=(
                 ("yaml", '*.yml;*.yaml'), ("All Files", '*')))[0])
         
             #Load settings from yaml file
-            config_loaded = yaml.safe_load(self.settings_path)
+            file = open(self.settings_path, 'r')
+            config_loaded = yaml.safe_load(file)
             #Load in the settings from the yaml
 
             for key in (analysisSettings + saveAndDisplaySettings):
-                #Add to new config
+                #Add to new config 
                 self.config[key] = config_loaded[key]
-                #Set entry
-                self.entries[key].set(config_loaded[key])
+                if type(self.entries[key]) == ctk.CTkEntry:
+                    #Set entry
+                    self.entries[key].insert(0, str(config_loaded[key]))
+                elif type(self.entries[key] == ctk.CTkCheckBox):
+                    if config_loaded[key]:
+                        self.entries[key].select()
+                    else:
+                        self.entries[key].deselect()
         except Exception as e:
             #Pop up with exception if failiure
             FailurePopup(self, str(e))
