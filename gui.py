@@ -89,7 +89,7 @@ class App(ctk.CTk):
         self.mode_select.grid(row = 1, column= 0, columnspan =2, padx =10, pady=10, sticky = 'new')
 
         #Save/Load Settings
-        self.save_button = ctk.CTkButton(self.sidebar_frame, text= 'Save Settings')
+        self.save_button = ctk.CTkButton(self.sidebar_frame, text= 'Save Settings', command= self.save_settings)
         self.save_button.grid(row = 2, column = 0, sticky = 'new', padx = 10, pady = 10, columnspan = 2)
         self.load_button = ctk.CTkButton(self.sidebar_frame, text = 'Load Settings', command=self.load_settings)
         self.load_button.grid(row = 3, column = 0, sticky = 'new', padx = 10, pady = 10, columnspan = 2)
@@ -232,10 +232,24 @@ class App(ctk.CTk):
         
 
     def save_settings(self):
-        pass
         #create dictionary from settings already available
+        self.config_from_box()
+        #Open a file dialog to specify the save location
+        file_path = ctk.filedialog.asksaveasfilename(
+            defaultextension=".yaml", 
+            filetypes=[("YAML files", "*.yaml")], 
+            title="Save YAML file"
+        )
+        
+        # If the user provides a file path, save the dictionary as YAML
+        try:
+            if file_path:
+                with open(file_path, 'w') as yaml_file:
+                    yaml.dump(self.config, yaml_file, default_flow_style=False, sort_keys=False)
+        except Exception as e:
+            FailurePopup(self, str(e))
 
-        #Save dictionary with popup
+
 
     def run_button_callback(self):
         #Pull settings from dialogue boxes
