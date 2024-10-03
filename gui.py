@@ -2,6 +2,7 @@ import customtkinter as ctk
 from PIL import Image
 from pathlib import Path
 import yaml
+import asyncio
 
 analysisSettings = ['Blur Sigma', 'Min Hole Size', 'Min Object Size', 'Min Spur Line Length',
                             'Min Length for Internal Line', 'Minimum Vessel Width']
@@ -135,6 +136,11 @@ class App(ctk.CTk):
             entry = ctk.CTkCheckBox(self.processing_scroll, text="")
             entry.grid(row = i, column = 1, padx = 10, pady = 10, sticky = 'ew')
             self.entries[setting] = entry
+        #Add button for save location, default to current directory
+        self.location_button = ctk.CTkButton(self.processing_scroll, text = "Save Location", command=self.set_save_path)
+        self.location_button.grid(row = len(saveAndDisplaySettings), column = 0, padx = 10, pady =10, sticky = 'ew')
+        #Set Results location to the current folder as default
+        self.save_path = Path.cwd()
 
         #Log box
         self.logBox = ctk.CTkTextbox(self.tab_select.tab("Log"))
@@ -145,7 +151,7 @@ class App(ctk.CTk):
         self.bottom_frame.grid(row=2, column=0, columnspan=2, sticky="ew")  # Spanning across both columns
         self.bottom_frame.grid_columnconfigure(0, weight=1)  # Adjusted configuration
         #Go Button
-        self.run_button = ctk.CTkButton(self.bottom_frame, text = "Run")
+        self.run_button = ctk.CTkButton(self.bottom_frame, text = "Run", command= self.run_button_callback)
         self.run_button.grid(row=0,column = 2, sticky = 'nsw')
         self.run_button.grid_columnconfigure(2,weight=1)
         #Loading Bar
@@ -250,6 +256,11 @@ class App(ctk.CTk):
             FailurePopup(self, str(e))
 
 
+    def set_save_path(self):
+        try:
+            self.save_path = ctk.filedialog.askdirectory()
+        except Exception as e:
+            FailurePopup(self, str(e))
 
     def run_button_callback(self):
         #Pull settings from dialogue boxes
@@ -267,11 +278,13 @@ class App(ctk.CTk):
         try:
             if self.image == None:
                 #Raise Error
-                raise ValueError("No Image Loaded")
+                FailurePopup(self, "No Image Loaded")
             if self.config == None:
-                raise ValueError("No Config Loaded")
+                FailurePopup(self, "No Config Loaded")
 
-            run_img(self.image, self.resultsPath, self.config, self.save_name, 0)
+            result = asyncio.run(run_img(self.image, self.resultsPath, self.config, self.save_name, 0))
+            #TODO Add result to log, show resultant image
+
         except Exception as e:
             FailurePopup(self, str(e))
 
