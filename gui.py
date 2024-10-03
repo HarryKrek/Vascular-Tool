@@ -162,8 +162,15 @@ class App(ctk.CTk):
 
         #Image Frame
         self.image = None
-        self.imageFrame = ctk.CTkLabel(self, text='', image = self.image)
+        self.imageAfter = None
+        self.imageFrame = ctk.CTkTabview(self, height = 1000)
         self.imageFrame.grid(row =0, column =1, padx = 20, pady = 20, sticky = 'nsew')
+        self.imageFrame.add("Input Image")
+        self.imageFrame.add("Output Image")
+        self.beforeImage = ctk.CTkLabel(self.imageFrame.tab("Input Image"), text='', image = self.image)
+        self.beforeImage.pack(fill = 'both', expand = True)
+        self.afterImage = ctk.CTkLabel(self.imageFrame.tab("Input Image"), text='', image = self.imageAfter)
+        self.afterImage.pack(fill = 'both', expand = True)
 
         self.setup_variables()
 
@@ -193,7 +200,7 @@ class App(ctk.CTk):
 
         #Update Image
         self.image = ctk.CTkImage(light_image=Image.open(self.imgPath), dark_image=Image.open('WT_1.tif'), size=(800,800))
-        self.imageFrame.configure(image = self.image)
+        self.beforeImage.configure(image = self.image)
 
 
 
@@ -262,6 +269,9 @@ class App(ctk.CTk):
         except Exception as e:
             FailurePopup(self, str(e))
 
+    def add_to_log(self, msg):
+        self.logBox.insert("0.0", msg + "\n" * 50)
+
     def run_button_callback(self):
         #Pull settings from dialogue boxes
 
@@ -282,8 +292,12 @@ class App(ctk.CTk):
             if self.config == None:
                 FailurePopup(self, "No Config Loaded")
 
-            result = asyncio.run(run_img(self.image, self.resultsPath, self.config, self.save_name, 0))
+            result = asyncio.run(run_img(self.imgPath, self.save_path, self.config, "result", 0))
+            #Get the resultant image to display
+            
             #TODO Add result to log, show resultant image
+            self.add_to_log(str(result))
+
 
         except Exception as e:
             FailurePopup(self, str(e))

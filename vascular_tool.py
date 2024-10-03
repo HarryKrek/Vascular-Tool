@@ -473,7 +473,7 @@ def draw_and_save_images(image, segmentation, bp, ep, skel, name, config):
         plt.show()
     else:
         plt.close()
-
+    
 
 def obtain_branch_and_end_points(graph: nx.MultiGraph):
     branchPoints = []
@@ -534,32 +534,38 @@ def save_results_to_csv(savename, data):
     df.to_csv(savename)
 
 
-def worker_process(args):
+async def run_img(image, resultsPath, config, saveName, i):
     try:
-        i, image, resultsPath, config = args
-        imgName = Path(image).stem
-
         rgbimg, blurred = import_and_blur_image(image, config)
         segmentation = segment_image(blurred)
         eroded = isotropic_erosion(segmentation, 1)
         cleaned_segmentation = remove_holes_and_small_items(eroded, config)
         skel, width_im, graph = create_skeleton(cleaned_segmentation, config)
         img_results, branchPoints, endPoints = process_image_results(
-            i, cleaned_segmentation, graph, skel, width_im, imgName
+            i, cleaned_segmentation, graph, skel, width_im, saveName
         )
         print(img_results)
-        draw_and_save_images(
+        drawn_img = draw_and_save_images(
             rgbimg,
             cleaned_segmentation,
             branchPoints,
             endPoints,
             skel,
-            os.path.abspath(resultsPath + imgName + ".tif"),
+            os.path.abspath(str(resultsPath) + "\\" +saveName + ".tif"),
             config,
         )
-        return img_results
+        return img_results,
     except Exception as e:
         print(f"EXCEPTION: {e}")
+
+
+def worker_process(args):
+    i, image, resultsPath, config = args
+    imgName = Path(image).stem
+    run_img(image, resultsPath, config, imgName, i)
+
+async def run_batch():
+    pass
 
 
 def main(path: str, savename: str, configPath: str):
