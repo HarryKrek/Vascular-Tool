@@ -3,6 +3,7 @@ from PIL import Image
 from pathlib import Path
 import yaml
 import asyncio
+import os
 
 analysisSettings = ['Blur Sigma', 'Min Hole Size', 'Min Object Size', 'Min Spur Line Length',
                             'Min Length for Internal Line', 'Minimum Vessel Width']
@@ -169,7 +170,7 @@ class App(ctk.CTk):
         self.imageFrame.add("Output Image")
         self.beforeImage = ctk.CTkLabel(self.imageFrame.tab("Input Image"), text='', image = self.image)
         self.beforeImage.pack(fill = 'both', expand = True)
-        self.afterImage = ctk.CTkLabel(self.imageFrame.tab("Input Image"), text='', image = self.imageAfter)
+        self.afterImage = ctk.CTkLabel(self.imageFrame.tab("Output Image"), text='', image = self.imageAfter)
         self.afterImage.pack(fill = 'both', expand = True)
 
         self.setup_variables()
@@ -199,7 +200,7 @@ class App(ctk.CTk):
             ("Image Files", '*.jpg;*.png;*.gif;*.bmp;*.tif;*.tiff'), ("All Files", '*')))[0]
 
         #Update Image
-        self.image = ctk.CTkImage(light_image=Image.open(self.imgPath), dark_image=Image.open('WT_1.tif'), size=(800,800))
+        self.image = ctk.CTkImage(light_image=Image.open(self.imgPath), dark_image=Image.open(self.imgPath), size=(800,800))
         self.beforeImage.configure(image = self.image)
 
 
@@ -291,13 +292,13 @@ class App(ctk.CTk):
                 FailurePopup(self, "No Image Loaded")
             if self.config == None:
                 FailurePopup(self, "No Config Loaded")
-
+            #TODO run as thread
             result = asyncio.run(run_img(self.imgPath, self.save_path, self.config, "result", 0))
             #Get the resultant image to display
-            
-            #TODO Add result to log, show resultant image
+            place = os.path.abspath(str(self.save_path) + "\\" +'result' + ".tif")
+            self.imageTwo = ctk.CTkImage(light_image=Image.open(place), dark_image=Image.open(place), size=(800,800))
+            self.afterImage.configure(image = self.imageTwo)
             self.add_to_log(str(result))
-
 
         except Exception as e:
             FailurePopup(self, str(e))
