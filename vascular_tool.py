@@ -534,7 +534,7 @@ def save_results_to_csv(savename, data):
     df.to_csv(savename)
 
 
-async def run_img(image, resultsPath, config, saveName, i):
+def run_img(image, resultsPath, config, saveName, i):
     try:
         rgbimg, blurred = import_and_blur_image(image, config)
         segmentation = segment_image(blurred)

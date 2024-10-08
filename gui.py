@@ -1,14 +1,19 @@
+import multiprocessing.pool
 import customtkinter as ctk
 from tkinter import ttk
 from PIL import Image
 from pathlib import Path
 import yaml
-import asyncio
+from concurrent.futures import ThreadPoolExecutor
+import multiprocessing
 import os
+import asyncio
 
 analysisSettings = ['Blur Sigma', 'Min Hole Size', 'Min Object Size', 'Min Spur Line Length',
                             'Min Length for Internal Line', 'Minimum Vessel Width']
 saveAndDisplaySettings = ['Save Image', 'Show Image']
+
+
 
 
 #Import components from vascular tool
@@ -164,6 +169,8 @@ class App(ctk.CTk):
         self.batch_frame = None
         self.status_indicators = None
 
+        self.executor = ThreadPoolExecutor()
+
         self.single_setup()
         
         self.setup_variables()
@@ -253,7 +260,7 @@ class App(ctk.CTk):
 
     def image_callback(self):
         #Single Image Mode
-        if self.mode_select == "Single Image":
+        if self.mode_select.get() == "Single Image":
             self.imgPath = ctk.filedialog.askopenfilenames(initialdir="./", title="Select Settings File", filetypes=(
                 ("Image Files", '*.jpg;*.png;*.gif;*.bmp;*.tif;*.tiff'), ("All Files", '*')))[0]
 
@@ -264,6 +271,9 @@ class App(ctk.CTk):
         #Batch Image Mode
         else:
             imgdir = ctk.filedialog.askdirectory(initialdir="./", title = "Select Directory")
+            if imgdir == '':
+                pass
+            
             self.update_batch(imgdir)
 
 
@@ -358,6 +368,13 @@ class App(ctk.CTk):
     def run_tool_batch(self):
         pass
 
+    def handle_result_single(self, result):
+            #Get the resultant image to display
+            place = os.path.abspath(str(self.save_path) + "\\" +'result' + ".tif")
+            self.imageTwo = ctk.CTkImage(light_image=Image.open(place), dark_image=Image.open(place), size=(800,800))
+            self.afterImage.configure(image = self.imageTwo)
+            self.add_to_log(str(result))
+
     def run_tool_single(self):
         try:
             if self.image == None:
@@ -365,13 +382,10 @@ class App(ctk.CTk):
                 FailurePopup(self, "No Image Loaded")
             if self.config == None:
                 FailurePopup(self, "No Config Loaded")
-            #TODO run as thread
-            result = asyncio.run(run_img(self.imgPath, self.save_path, self.config, "result", 0))
-            #Get the resultant image to display
-            place = os.path.abspath(str(self.save_path) + "\\" +'result' + ".tif")
-            self.imageTwo = ctk.CTkImage(light_image=Image.open(place), dark_image=Image.open(place), size=(800,800))
-            self.afterImage.configure(image = self.imageTwo)
-            self.add_to_log(str(result))
+
+            future = self.executor.submit(run_img, self.imgPath, self.save_path, 
+                                    self.config, "result", 0)
+            future.add_done_callback(lambda f: self.after(0, self.handle_result_single, f.result()))  # Use after() to run on main thread
 
         except Exception as e:
             FailurePopup(self, str(e))
