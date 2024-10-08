@@ -1,4 +1,5 @@
 import customtkinter as ctk
+from tkinter import ttk
 from PIL import Image
 from pathlib import Path
 import yaml
@@ -160,6 +161,18 @@ class App(ctk.CTk):
         self.load_bar.grid(row = 0, column = 0, sticky = 'nsew')
         self.load_bar.grid_columnconfigure(0,weight=1)
 
+        self.batch_frame = None
+        self.status_indicators = None
+
+        self.single_setup()
+        
+        self.setup_variables()
+
+    def single_setup(self):
+        if self.batch_frame is not None:
+            if self.status_table is not None:
+                del self.status_table
+            del self.batch_frame
 
         #Image Frame
         self.image = None
@@ -173,14 +186,58 @@ class App(ctk.CTk):
         self.afterImage = ctk.CTkLabel(self.imageFrame.tab("Output Image"), text='', image = self.imageAfter)
         self.afterImage.pack(fill = 'both', expand = True)
 
-        self.setup_variables()
+        self.image_select.configure(text = "Choose Image")
+
+    
+    def batch_setup(self):
+        #Teardown the single image parts:
+        if self.imageFrame is not None:
+            del self.imageFrame
+        
+        # #Add Batch Scroll View
+        self.batch_frame = ctk.CTkFrame(self, height = 3000)
+        self.batch_frame.grid(row =0, column = 1, padx = 20, pady = 20, sticky = 'nsew')
+        # titleFont = ctk.CTkFont("Arial", size = 16, weight = 'bold')
+        # self.batch_title = ctk.CTkLabel(self.batch_frame, text="Batch Image Processing Status", height = 80, font=titleFont)
+        # self.batch_title.pack(anchor = 'n', expand= False, fill = 'x', pady = 10)
+        # self.batch_scroll = ctk.CTkScrollableFrame(self.batch_frame)
+        # self.batch_scroll.pack(anchor = 's', expand = True, fill = 'both')
+
+        columns = ("Name", "Status")
+
+        self.status_table = ttk.Treeview(self.batch_frame, columns = columns, show = 'headings')
+        self.status_table.heading("Name", text = "Name")
+        self.status_table.heading("Status", text = "Status")
+        self.status_table.pack(fill='both', expand= True)
+
+        #Change Image selection text
+        self.image_select.configure(text = "Select Image Directory")
+
+
+
+    def update_batch(self, path):
+        self.batch_full_path = os.listdir(path)
+        itemNames = [os.path.basename(item) for item in self.batch_full_path]
+
+        #Add names to status as a dictionary
+        self.status_indicators = {}
+        for i, name in enumerate(itemNames):
+            #Row = i
+            values = (name, "❌")
+            self.status_table.insert(parent = '', index = 0, values=values)
+            
+            saveVal = {'row': i, 'name':name, 'status':'❌'}
+            self.status_indicators[self.batch_full_path[i]] = saveVal
+            
+
 
     def mode_selection(self, mode):
-        #TODO SETUP CHANGE IN VIEW WHEN DOING BATCH SETUP
         if mode == 'Batch Process':
             self.batch = True
+            self.batch_setup()
         else:
             self.batch = False
+            self.single_setup()
 
     def setup_variables(self):
         self.imgPath = None
@@ -195,13 +252,19 @@ class App(ctk.CTk):
                                                         "*.*")))
 
     def image_callback(self):
-        # if self.mode_selec
-        self.imgPath = ctk.filedialog.askopenfilenames(initialdir="./", title="Select Settings File", filetypes=(
-            ("Image Files", '*.jpg;*.png;*.gif;*.bmp;*.tif;*.tiff'), ("All Files", '*')))[0]
+        #Single Image Mode
+        if self.mode_select == "Single Image":
+            self.imgPath = ctk.filedialog.askopenfilenames(initialdir="./", title="Select Settings File", filetypes=(
+                ("Image Files", '*.jpg;*.png;*.gif;*.bmp;*.tif;*.tiff'), ("All Files", '*')))[0]
 
-        #Update Image
-        self.image = ctk.CTkImage(light_image=Image.open(self.imgPath), dark_image=Image.open(self.imgPath), size=(800,800))
-        self.beforeImage.configure(image = self.image)
+            #Update Image
+            self.image = ctk.CTkImage(light_image=Image.open(self.imgPath), dark_image=Image.open(self.imgPath), size=(800,800))
+            self.beforeImage.configure(image = self.image)
+        
+        #Batch Image Mode
+        else:
+            imgdir = ctk.filedialog.askdirectory(initialdir="./", title = "Select Directory")
+            self.update_batch(imgdir)
 
 
 
@@ -223,7 +286,10 @@ class App(ctk.CTk):
 
             self.settings_path = Path(ctk.filedialog.askopenfilenames(initialdir="./", title="Select Settings File", filetypes=(
                 ("yaml", '*.yml;*.yaml'), ("All Files", '*')))[0])
-        
+            
+            if self.settings_path == "":
+                pass
+            
             #Load settings from yaml file
             file = open(self.settings_path, 'r')
             config_loaded = yaml.safe_load(file)
@@ -255,6 +321,10 @@ class App(ctk.CTk):
             title="Save YAML file"
         )
         
+        if file_path == "":
+            pass
+
+
         # If the user provides a file path, save the dictionary as YAML
         try:
             if file_path:
@@ -267,6 +337,9 @@ class App(ctk.CTk):
     def set_save_path(self):
         try:
             self.save_path = ctk.filedialog.askdirectory()
+            if self.save_path == "":
+                pass
+        
         except Exception as e:
             FailurePopup(self, str(e))
 
