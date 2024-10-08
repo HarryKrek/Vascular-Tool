@@ -564,7 +564,7 @@ def run_img(image, resultsPath, config, saveName, i):
 def worker_process(args):
     i, image, resultsPath, config = args
     imgName = Path(image).stem
-    run_img(image, resultsPath, config, imgName, i)
+    return run_img(image, resultsPath, config, imgName, i)
 
 async def run_batch():
     pass

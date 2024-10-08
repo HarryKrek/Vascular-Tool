@@ -168,6 +168,7 @@ class App(ctk.CTk):
 
         self.batch_frame = None
         self.status_indicators = None
+        self.logRow = -1
 
         self.executor = ThreadPoolExecutor(max_workers=4)
 
@@ -355,7 +356,8 @@ class App(ctk.CTk):
     def add_to_log(self, msg):
         if msg == None:
             return
-        self.logBox.insert("0.0", msg + "\n" * 50)
+        self.logRow += 1
+        self.logBox.insert(f"{self.logRow}.0", msg + "\n" * 50)
 
     def run_button_callback(self):
         #Pull settings from dialogue boxes
@@ -374,7 +376,8 @@ class App(ctk.CTk):
             self.add_to_log(str(result))
 
     def update_progress_bar(self, current):
-        self.load_bar.set(current/self.total_items)
+        val = current/self.total_items if current != 0 else 0
+        self.load_bar.set(val)
         
 
     from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -383,6 +386,7 @@ class App(ctk.CTk):
         self.batch_results = []
         self.config['Save Image'] = False
         self.config['Show Image'] = False
+        self.update_progress_bar(0)
 
         try:
             if self.batch_full_path is None:
@@ -415,7 +419,8 @@ class App(ctk.CTk):
                 # Check if the future is done
                 if future.done():
                     try:
-                        result = future.result()  # Blocking call, should return immediately if done
+                        result = str(future.result()[0])  # Blocking call, should return immediately if done
+                        print(result)
                         self.completed_tasks += 1
                         self.add_to_log(result)
                         self.batch_results.append(result)
