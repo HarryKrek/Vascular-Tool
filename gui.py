@@ -4,8 +4,8 @@ from tkinter import ttk
 from PIL import Image
 from pathlib import Path
 import yaml
-from concurrent.futures import ThreadPoolExecutor
-import multiprocessing
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from multiprocessing import Pool, cpu_count, set_start_method, Manager
 import os
 import asyncio
 
@@ -17,7 +17,7 @@ saveAndDisplaySettings = ['Save Image', 'Show Image']
 
 
 #Import components from vascular tool
-from vascular_tool import run_img, run_batch
+from vascular_tool import run_img, run_batch, worker_process, find_images_in_path
 
 class SettingFrame(ctk.CTkScrollableFrame):
     def __init__(self, master):
@@ -169,7 +169,7 @@ class App(ctk.CTk):
         self.batch_frame = None
         self.status_indicators = None
 
-        self.executor = ThreadPoolExecutor()
+        self.executor = ThreadPoolExecutor(max_workers=cpu_count())
 
         self.single_setup()
         
@@ -204,14 +204,7 @@ class App(ctk.CTk):
         # #Add Batch Scroll View
         self.batch_frame = ctk.CTkFrame(self, height = 3000)
         self.batch_frame.grid(row =0, column = 1, padx = 20, pady = 20, sticky = 'nsew')
-        # titleFont = ctk.CTkFont("Arial", size = 16, weight = 'bold')
-        # self.batch_title = ctk.CTkLabel(self.batch_frame, text="Batch Image Processing Status", height = 80, font=titleFont)
-        # self.batch_title.pack(anchor = 'n', expand= False, fill = 'x', pady = 10)
-        # self.batch_scroll = ctk.CTkScrollableFrame(self.batch_frame)
-        # self.batch_scroll.pack(anchor = 's', expand = True, fill = 'both')
-
         columns = ("Name", "Status")
-
         self.status_table = ttk.Treeview(self.batch_frame, columns = columns, show = 'headings')
         self.status_table.heading("Name", text = "Name")
         self.status_table.heading("Status", text = "Status")
@@ -223,7 +216,7 @@ class App(ctk.CTk):
 
 
     def update_batch(self, path):
-        self.batch_full_path = os.listdir(path)
+        self.batch_full_path = find_images_in_path(path)
         itemNames = [os.path.basename(item) for item in self.batch_full_path]
 
         #Add names to status as a dictionary
@@ -263,6 +256,8 @@ class App(ctk.CTk):
         if self.mode_select.get() == "Single Image":
             self.imgPath = ctk.filedialog.askopenfilenames(initialdir="./", title="Select Settings File", filetypes=(
                 ("Image Files", '*.jpg;*.png;*.gif;*.bmp;*.tif;*.tiff'), ("All Files", '*')))[0]
+            if self.imgPath == '':
+                pass
 
             #Update Image
             self.image = ctk.CTkImage(light_image=Image.open(self.imgPath), dark_image=Image.open(self.imgPath), size=(800,800))
@@ -358,15 +353,12 @@ class App(ctk.CTk):
 
     def run_button_callback(self):
         #Pull settings from dialogue boxes
-
+        self.config_from_box()
         #Run Relevant process
         if self.batch:
             self.run_tool_batch()
         else:
             self.run_tool_single()
-
-    def run_tool_batch(self):
-        pass
 
     def handle_result_single(self, result):
             #Get the resultant image to display
@@ -374,6 +366,31 @@ class App(ctk.CTk):
             self.imageTwo = ctk.CTkImage(light_image=Image.open(place), dark_image=Image.open(place), size=(800,800))
             self.afterImage.configure(image = self.imageTwo)
             self.add_to_log(str(result))
+
+    def run_tool_batch(self):
+        self.batch_results = []
+        try:
+            if self.batch_full_path == None:
+                FailurePopup(self, "No Directory Selected")
+
+            args = [
+                (i, image, self.save_path, self.config) 
+                for i, image in enumerate(self.batch_full_path) 
+                if i % 1 == 0]
+            
+
+            future_to_arg = {self.executor.submit(worker_process, arg): arg for arg in args}
+            completed_tasks = 0
+            for future in as_completed(future_to_arg, timeout=0.5):
+                if future.done():
+                    # Get the result (blocking call)
+                    result = future.result()
+                    completed_tasks += 1
+                    self.add_to_log(result)
+                    self.batch_results.append(result)
+
+        except Exception as e:
+            FailurePopup(self, str(e))
 
     def run_tool_single(self):
         try:

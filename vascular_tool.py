@@ -63,7 +63,7 @@ def get_running_approval():
 
 
 def import_and_blur_image(imgPath, config):
-    sigma = config.get("Blur Sigma")
+    sigma = float(config.get("Blur Sigma"))
     img = io.imread(imgPath)
     if len(np.shape(img)) == 3:
         imgGrey = img[:, :, 1]  # Take the green channel
@@ -87,8 +87,8 @@ def segment_image(blurred):
 
 
 def remove_holes_and_small_items(segmentation, config):
-    min_object_size = config.get("Min Object Size")
-    min_hole_size = config.get("Min Hole Size")
+    min_object_size = int(config.get("Min Object Size"))
+    min_hole_size = int(config.get("Min Hole Size"))
     ensmallend = remove_small_objects(
         segmentation, min_size=min_object_size, connectivity=8
     )
@@ -103,7 +103,7 @@ def vessel_width_and_prune(skel, segmentation, config: dict):
     # Use skel as a mask to get distance_skel:
     distance_skel = distance_img * (skel > 0)
     # Prune skeleton if below required width
-    new_skel = 2 * distance_skel > config.get("Minimum Vessel Width")
+    new_skel = 2 * distance_skel > int(config.get("Minimum Vessel Width"))
     skel_width = new_skel * distance_img * 2
     return np.uint8(new_skel * 255), skel_width
 
@@ -111,7 +111,7 @@ def vessel_width_and_prune(skel, segmentation, config: dict):
 def prune_skeleton_spurs_with_graph(
     graph: nx.MultiGraph, config: dict
 ) -> nx.MultiGraph:
-    line_min = config.get("Min Spur Line Length")
+    line_min = int(config.get("Min Spur Line Length"))
     nodeRemovalCandidates = []
 
     # If node removal is 0 simply return the graph unchanged
@@ -286,7 +286,7 @@ def consolidate_internal_graph_edges(
     graph: nx.MultiGraph, config: dict
 ) -> nx.MultiGraph:
     # min Length
-    minLen = config.get("Min Length for Internal Line")
+    minLen = int(config.get("Min Length for Internal Line"))
     if minLen == 0:
         return graph
     # no nodes have been touched yet
@@ -423,8 +423,8 @@ def create_skeleton(segmentation, config):
 
 
 def draw_and_save_images(image, segmentation, bp, ep, skel, name, config):
-    save = config.get("Save Image")
-    show = config.get("Show Image")
+    save = bool(config.get("Save Image"))
+    show = bool(config.get("Show Image"))
     if not save and not show:
         pass
     # skimage.io.imsave(name, segmentation)
