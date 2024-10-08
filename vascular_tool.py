@@ -466,13 +466,14 @@ def draw_and_save_images(image, segmentation, bp, ep, skel, name, config):
     # Save image, not working too well at the moment+
     # skimage.io.imsave(name,adjusted)
     ax.axis("off")
+    plt.ion()
     if save:
         plt.savefig(name, bbox_inches="tight", pad_inches=0, transparent=True)
     if show:
         ax.set_title(name)
         plt.show()
     else:
-        plt.close()
+        plt.close(fig)
     
 
 def obtain_branch_and_end_points(graph: nx.MultiGraph):
@@ -545,15 +546,16 @@ def run_img(image, resultsPath, config, saveName, i):
             i, cleaned_segmentation, graph, skel, width_im, saveName
         )
         print(img_results)
-        drawn_img = draw_and_save_images(
-            rgbimg,
-            cleaned_segmentation,
-            branchPoints,
-            endPoints,
-            skel,
-            os.path.abspath(str(resultsPath) + "\\" +saveName + ".tif"),
-            config,
-        )
+        if config['Save Image'] or config['Show Image']:
+            drawn_img = draw_and_save_images(
+                rgbimg,
+                cleaned_segmentation,
+                branchPoints,
+                endPoints,
+                skel,
+                os.path.abspath(str(resultsPath) + "\\" +saveName + ".tif"),
+                config,
+            )
         return img_results,
     except Exception as e:
         print(f"EXCEPTION: {e}")

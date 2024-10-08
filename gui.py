@@ -169,7 +169,7 @@ class App(ctk.CTk):
         self.batch_frame = None
         self.status_indicators = None
 
-        self.executor = ThreadPoolExecutor(max_workers=cpu_count())
+        self.executor = ThreadPoolExecutor(max_workers=4)
 
         self.single_setup()
         
@@ -254,9 +254,13 @@ class App(ctk.CTk):
     def image_callback(self):
         #Single Image Mode
         if self.mode_select.get() == "Single Image":
-            self.imgPath = ctk.filedialog.askopenfilenames(initialdir="./", title="Select Settings File", filetypes=(
-                ("Image Files", '*.jpg;*.png;*.gif;*.bmp;*.tif;*.tiff'), ("All Files", '*')))[0]
-            if self.imgPath == '':
+            try:
+
+                self.imgPath = ctk.filedialog.askopenfilenames(initialdir="./", title="Select Settings File", filetypes=(
+                    ("Image Files", '*.jpg;*.png;*.gif;*.bmp;*.tif;*.tiff'), ("All Files", '*')))[0]
+                if self.imgPath == '':
+                    pass
+            except IndexError:
                 pass
 
             #Update Image
@@ -280,7 +284,7 @@ class App(ctk.CTk):
             self.config[key] = self.entries[key].get()
         
 
-    def load_settings(self):
+    def load_settings(self):        
         #Load Settings
         try:
             #Clear config and settings inputs
@@ -349,6 +353,8 @@ class App(ctk.CTk):
             FailurePopup(self, str(e))
 
     def add_to_log(self, msg):
+        if msg == None:
+            return
         self.logBox.insert("0.0", msg + "\n" * 50)
 
     def run_button_callback(self):
@@ -367,45 +373,75 @@ class App(ctk.CTk):
             self.afterImage.configure(image = self.imageTwo)
             self.add_to_log(str(result))
 
+    def update_progress_bar(self, current):
+        self.load_bar.set(current/self.total_items)
+        
+
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
     def run_tool_batch(self):
         self.batch_results = []
+        self.config['Save Image'] = False
+        self.config['Show Image'] = False
+
         try:
-            if self.batch_full_path == None:
+            if self.batch_full_path is None:
                 FailurePopup(self, "No Directory Selected")
+                return
+            
+            self.total_items = len(self.batch_full_path)
 
             args = [
                 (i, image, self.save_path, self.config) 
-                for i, image in enumerate(self.batch_full_path) 
-                if i % 1 == 0]
+                for i, image in enumerate(self.batch_full_path)
+            ]
+
+            # Use ThreadPoolExecutor to run tasks in a separate thread
+            self.executor = ThreadPoolExecutor(max_workers=4)  # Adjust number of workers as needed
+            self.future_to_arg = {self.executor.submit(worker_process, arg): arg for arg in args}
+            self.completed_tasks = 0
             
-
-            future_to_arg = {self.executor.submit(worker_process, arg): arg for arg in args}
-            completed_tasks = 0
-            for future in as_completed(future_to_arg, timeout=0.5):
-                if future.done():
-                    # Get the result (blocking call)
-                    result = future.result()
-                    completed_tasks += 1
-                    self.add_to_log(result)
-                    self.batch_results.append(result)
+            # Start polling for results asynchronously
+            self.check_tasks()
 
         except Exception as e:
             FailurePopup(self, str(e))
 
-    def run_tool_single(self):
+    def check_tasks(self):
+        # Poll the futures periodically to update the GUI
         try:
-            if self.image == None:
-                #Raise Error
-                FailurePopup(self, "No Image Loaded")
-            if self.config == None:
-                FailurePopup(self, "No Config Loaded")
-
-            future = self.executor.submit(run_img, self.imgPath, self.save_path, 
-                                    self.config, "result", 0)
-            future.add_done_callback(lambda f: self.after(0, self.handle_result_single, f.result()))  # Use after() to run on main thread
-
+            # Loop over the futures without blocking the main thread
+            for future in list(self.future_to_arg):  # Convert to list to safely modify in loop
+                # Check if the future is done
+                if future.done():
+                    try:
+                        result = future.result()  # Blocking call, should return immediately if done
+                        self.completed_tasks += 1
+                        self.add_to_log(result)
+                        self.batch_results.append(result)
+                        self.update_progress_bar(self.completed_tasks)
+                        
+                        del self.future_to_arg[future]  # Remove completed future
+                    except Exception as e:
+                        # Handle exceptions from the worker process
+                        FailurePopup(self, f"Task failed: {str(e)}")
+        
         except Exception as e:
+            # Handle exceptions from future processing
             FailurePopup(self, str(e))
+
+        # Continue polling if there are tasks remaining
+        if self.future_to_arg:
+            self.after(100, self.check_tasks)  # Poll again after 100ms (adjust as needed)
+        else:
+            # All tasks are completed, handle end of batch
+            self.on_batch_complete()
+
+    def on_batch_complete(self):
+        # Handle what happens after all tasks are completed
+        print("Batch processing complete")
+        # Update GUI or perform any other finalization tasks
+
 
 
 
