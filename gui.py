@@ -1,4 +1,3 @@
-import multiprocessing.pool
 import customtkinter as ctk
 from tkinter import ttk
 from PIL import Image
@@ -7,7 +6,7 @@ import yaml
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from multiprocessing import Pool, cpu_count, set_start_method, Manager
 import os
-import asyncio
+import datetime
 
 analysisSettings = ['Blur Sigma', 'Min Hole Size', 'Min Object Size', 'Min Spur Line Length',
                             'Min Length for Internal Line', 'Minimum Vessel Width']
@@ -17,7 +16,7 @@ saveAndDisplaySettings = ['Save Image', 'Show Image']
 
 
 #Import components from vascular tool
-from vascular_tool import run_img, run_batch, worker_process, find_images_in_path
+from vascular_tool import  run_img, worker_process, find_images_in_path, save_results_to_csv
 
 class SettingFrame(ctk.CTkScrollableFrame):
     def __init__(self, master):
@@ -170,7 +169,7 @@ class App(ctk.CTk):
         self.status_indicators = None
         self.logRow = -1
 
-        self.executor = ThreadPoolExecutor(max_workers=4)
+        self.executor = ThreadPoolExecutor(max_workers=cpu_count())
 
         self.single_setup()
         
@@ -379,8 +378,20 @@ class App(ctk.CTk):
         val = current/self.total_items if current != 0 else 0
         self.load_bar.set(val)
         
+    def run_tool_single(self):
+        try:
+            if self.image == None:
+                #Raise Error
+                FailurePopup(self, "No Image Loaded")
+            if self.config == None:
+                FailurePopup(self, "No Config Loaded")
 
-    from concurrent.futures import ThreadPoolExecutor, as_completed
+            future = self.executor.submit(run_img, self.imgPath, self.save_path, 
+                                    self.config, "result", 0)
+            future.add_done_callback(lambda f: self.after(0, self.handle_result_single, f.result()))  # Use after() to run on main thread
+
+        except Exception as e:
+            FailurePopup(self, str(e))
 
     def run_tool_batch(self):
         self.batch_results = []
@@ -443,13 +454,9 @@ class App(ctk.CTk):
             self.on_batch_complete()
 
     def on_batch_complete(self):
-        # Handle what happens after all tasks are completed
-        print("Batch processing complete")
-        # Update GUI or perform any other finalization tasks
-
-
-
-
+        # Save results to excel
+        name = "Results.csv"
+        save_results_to_csv(name, self.batch_results)
 
 if __name__ == '__main__':
     app = App()
