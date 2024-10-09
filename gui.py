@@ -466,6 +466,7 @@ class App(ctk.CTk):
         # Save results to excel
         name = "Results.csv"
         save_results_to_csv(name, self.batch_results)
+        FailurePopup(self, "Finished and Saved Successfully")
 
 if __name__ == '__main__':
     app = App()
