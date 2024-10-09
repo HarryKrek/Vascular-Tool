@@ -169,7 +169,7 @@ class App(ctk.CTk):
         self.status_indicators = None
         self.logRow = -1
 
-        self.executor = ThreadPoolExecutor(max_workers=cpu_count())
+        self.executor = ThreadPoolExecutor(max_workers = 6)
 
         self.single_setup()
         
@@ -222,12 +222,11 @@ class App(ctk.CTk):
         #Add names to status as a dictionary
         self.status_indicators = {}
         for i, name in enumerate(itemNames):
-            #Row = i
             values = (name, "❌")
-            self.status_table.insert(parent = '', index = 0, values=values)
+            self.status_table.insert(parent = '', index = -1, values=values)
             
             saveVal = {'row': i, 'name':name, 'status':'❌'}
-            self.status_indicators[self.batch_full_path[i]] = saveVal
+            self.status_indicators[name] = saveVal
             
 
 
@@ -361,6 +360,11 @@ class App(ctk.CTk):
     def run_button_callback(self):
         #Pull settings from dialogue boxes
         self.config_from_box()
+        #Check to make sure its been filled
+        for val in self.config:
+            if self.config[val] == '':
+                FailurePopup(self, 'Missing Settings Inputs')
+                return
         #Run Relevant process
         if self.batch:
             self.run_tool_batch()
@@ -412,7 +416,7 @@ class App(ctk.CTk):
             ]
 
             # Use ThreadPoolExecutor to run tasks in a separate thread
-            self.executor = ThreadPoolExecutor(max_workers=4)  # Adjust number of workers as needed
+            self.executor = ThreadPoolExecutor(max_workers=cpu_count())  # Adjust number of workers as needed
             self.future_to_arg = {self.executor.submit(worker_process, arg): arg for arg in args}
             self.completed_tasks = 0
             
@@ -430,12 +434,17 @@ class App(ctk.CTk):
                 # Check if the future is done
                 if future.done():
                     try:
-                        result = str(future.result()[0])  # Blocking call, should return immediately if done
-                        print(result)
+                        result = future.result()[0]  # Blocking call, should return immediately if done
                         self.completed_tasks += 1
-                        self.add_to_log(result)
+                        self.add_to_log(str(result))
                         self.batch_results.append(result)
                         self.update_progress_bar(self.completed_tasks)
+
+                        #Update result value
+                        name = result['Name']
+                        row_num = self.status_indicators[name].get('row') - 1
+                        row_id = self.status_table.get_children()[row_num]
+                        self.status_table.set(row_id, column = 'Status', value = '✅')
                         
                         del self.future_to_arg[future]  # Remove completed future
                     except Exception as e:
