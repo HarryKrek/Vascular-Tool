@@ -4,8 +4,9 @@ from PIL import Image
 from pathlib import Path
 import yaml
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from multiprocessing import Pool, cpu_count, set_start_method, Manager
+from multiprocessing import cpu_count, freeze_support
 import os
+import sys
 import datetime
 
 analysisSettings = ['Blur Sigma', 'Min Hole Size', 'Min Object Size', 'Min Spur Line Length',
@@ -195,6 +196,10 @@ class App(ctk.CTk):
 
         self.image_select.configure(text = "Choose Image")
 
+        #Change save to be on and defaulted
+        self.entries['Save Image'].select()
+        self.entries['Save Image'].configure(state = ctk.DISABLED)
+
     
     def batch_setup(self):
         #Teardown the single image parts:
@@ -212,6 +217,7 @@ class App(ctk.CTk):
 
         #Change Image selection text
         self.image_select.configure(text = "Select Image Directory")
+        self.entries['Save Image'].configure(state = ctk.NORMAL)
 
 
 
@@ -469,5 +475,6 @@ class App(ctk.CTk):
         FailurePopup(self, "Finished and Saved Successfully")
 
 if __name__ == '__main__':
+    freeze_support()
     app = App()
     app.mainloop()
