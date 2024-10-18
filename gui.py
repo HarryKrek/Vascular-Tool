@@ -408,6 +408,10 @@ class App(ctk.CTk):
             self.batch_results.append(result)
             self.img_count += 1
 
+            #Show Image?
+            if self.config["Show Image"]:
+                self.imageFrame.set("Output Image")
+
     def update_progress_bar(self, current):
         val = current/self.total_items if current != 0 else 0
         self.load_bar.set(val)
