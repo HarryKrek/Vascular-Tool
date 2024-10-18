@@ -179,6 +179,7 @@ class App(ctk.CTk):
         self.setup_variables()
 
         self.batch_results = []
+        self.img_count = 0
 
 
     def clear_log(self):
@@ -380,7 +381,7 @@ class App(ctk.CTk):
         if msg == None:
             return
         self.logRow += 1
-        self.logBox.insert(f"{self.logRow}.0", msg + "\n" * 50)
+        self.logBox.insert(f"{self.logRow}.0", msg)
 
     def run_button_callback(self):
         #Pull settings from dialogue boxes
@@ -398,11 +399,14 @@ class App(ctk.CTk):
 
     def handle_result_single(self, result):
             #Get the resultant image to display
-            place = os.path.abspath(str(self.save_path) + "\\" +'result' + ".tif")
+            result = result[0]
+            result["Num"] = self.img_count
+            place = os.path.abspath(str(self.save_path) + "\\" + f'result_{self.img_count}' + ".tif")
             self.imageTwo = ctk.CTkImage(light_image=Image.open(place), dark_image=Image.open(place), size=(800,800))
             self.afterImage.configure(image = self.imageTwo)
             self.add_to_log(str(result))
-            self.batch_results.append(result[0])
+            self.batch_results.append(result)
+            self.img_count += 1
 
     def update_progress_bar(self, current):
         val = current/self.total_items if current != 0 else 0
@@ -417,7 +421,7 @@ class App(ctk.CTk):
                 FailurePopup(self, "No Config Loaded")
 
             future = self.executor.submit(run_img, self.imgPath, self.save_path, 
-                                    self.config, "result", 0)
+                                    self.config, f"result_{self.img_count}", 0)
             future.add_done_callback(lambda f: self.after(0, self.handle_result_single, f.result()))  # Use after() to run on main thread
 
         except Exception as e:
@@ -490,7 +494,7 @@ class App(ctk.CTk):
 
     def on_batch_complete(self):
         # Save results to excel
-        name = "Results.csv"
+        name = str(self.save_path) + "\\Results.csv"
         save_results_to_csv(name, self.batch_results)
         FailurePopup(self, "Finished and Saved Successfully")
 

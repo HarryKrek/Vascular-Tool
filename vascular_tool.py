@@ -537,6 +537,7 @@ def save_results_to_csv(savename, data):
 
 def run_img(image, resultsPath, config, saveName, i):
     try:
+        print(f"RUNNING! - {image}")
         rgbimg, blurred = import_and_blur_image(image, config)
         segmentation = segment_image(blurred)
         eroded = isotropic_erosion(segmentation, 1)
