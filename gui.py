@@ -85,8 +85,6 @@ class App(ctk.CTk):
         self.image_select = ctk.CTkButton(self.sidebar_frame, text = "Choose Image", corner_radius = 3, height = 100, command = self.image_callback)
         self.image_select.grid(row = 0, column = 0, padx = 10, pady = 10, sticky = 'ew')
         #Image selection button
-        self.settings_select = ctk.CTkButton(self.sidebar_frame, text = "Settings File", corner_radius=3, height = 100, command = self.settings_callback)
-        self.settings_select.grid(row = 0, column = 1, padx = 10, pady = 10, sticky = 'ew')
 
 
         #Fill this with selection
@@ -152,6 +150,10 @@ class App(ctk.CTk):
         #Log box
         self.logBox = ctk.CTkTextbox(self.tab_select.tab("Log"))
         self.logBox.pack(side = 'bottom', fill = 'both', expand = True, padx= 0, pady = 0)
+        self.logClearButton = ctk.CTkButton(self.tab_select.tab("Log"), text = "Clear Log", command=self.clear_log)
+        self.logClearButton.pack(side='top', anchor = 'w', fill = 'x')
+        self.logSaveButton = ctk.CTkButton(self.tab_select.tab("Log"), text = "Save Results", command=self.on_batch_complete)
+        self.logSaveButton.pack(side='top', anchor = 'e', fill = 'x')
 
         # Place loading bar frame at the bottom
         self.bottom_frame = ctk.CTkFrame(self, corner_radius=3)
@@ -175,6 +177,18 @@ class App(ctk.CTk):
         self.single_setup()
         
         self.setup_variables()
+
+        self.batch_results = []
+
+
+    def clear_log(self):
+        startIndex = "0.0"
+        endIndex = f"{self.logRow + 2}.0"
+
+        self.logBox.delete(startIndex, endIndex)
+        self.logRow = 0
+        self.batch_results = []
+
 
     def single_setup(self):
         if self.batch_frame is not None:
@@ -297,6 +311,7 @@ class App(ctk.CTk):
             for key in (analysisSettings + saveAndDisplaySettings):
                 if type(self.entries[key]) == ctk.CTkEntry:
                     self.entries[key].delete(0, -1)
+                
 
             self.settings_path = Path(ctk.filedialog.askopenfilenames(initialdir="./", title="Select Settings File", filetypes=(
                 ("yaml", '*.yml;*.yaml'), ("All Files", '*')))[0])
@@ -316,6 +331,10 @@ class App(ctk.CTk):
                     #Set entry
                     self.entries[key].insert(0, str(config_loaded[key]))
                 elif type(self.entries[key] == ctk.CTkCheckBox):
+                    if key == "Save Image" and not self.batch:
+                        self.entries['Save Image'].select()
+                        continue
+
                     if config_loaded[key]:
                         self.entries[key].select()
                     else:
@@ -383,6 +402,7 @@ class App(ctk.CTk):
             self.imageTwo = ctk.CTkImage(light_image=Image.open(place), dark_image=Image.open(place), size=(800,800))
             self.afterImage.configure(image = self.imageTwo)
             self.add_to_log(str(result))
+            self.batch_results.append(result[0])
 
     def update_progress_bar(self, current):
         val = current/self.total_items if current != 0 else 0
