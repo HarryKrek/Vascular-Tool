@@ -8,6 +8,7 @@ from multiprocessing import cpu_count, freeze_support
 import os
 import sys
 import datetime
+from skimage.io import imsave
 
 analysisSettings = ['Blur Sigma', 'Min Hole Size', 'Min Object Size', 'Min Spur Line Length',
                             'Min Length for Internal Line', 'Minimum Vessel Width']
@@ -433,7 +434,7 @@ class App(ctk.CTk):
 
     def run_tool_batch(self):
         self.batch_results = []
-        self.config['Save Image'] = False
+        self.config['Save Image'] = True
         self.config['Show Image'] = False
         self.update_progress_bar(0)
 

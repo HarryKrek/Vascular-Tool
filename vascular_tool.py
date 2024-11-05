@@ -8,11 +8,12 @@ from skimage.morphology import (
     remove_small_holes,
     isotropic_dilation,
     isotropic_erosion,
-    disk,
 )
 from skimage.measure import label
 from skimage.filters import gaussian, threshold_local
 from skimage.exposure import equalize_adapthist, rescale_intensity
+from skimage.draw import disk
+from skimage.util import img_as_ubyte
 import numpy as np
 from scipy.ndimage import distance_transform_edt
 import pandas as pd
@@ -450,30 +451,20 @@ def draw_and_save_images(image, segmentation, bp, ep, skel, name, config):
         bg_color=None,
         saturation=1,
     )
-    adjusted = (maskedSkel * 255).astype(np.uint8)
-    fig, ax = plt.subplots()
-    fig.set_dpi(100)
-    fig.set_size_inches(16, 16)
-
-    ax.imshow(adjusted)
-    plt.scatter(
-        [point[1] for point in bp], [point[0] for point in bp], color="blue", s=50
-    )
-    plt.scatter(
-        [point[1] for point in ep], [point[0] for point in ep], color="green", s=50
-    )
-    # plt.imshow(skel > 0, alpha=0.8)
-    # Save image, not working too well at the moment+
-    # skimage.io.imsave(name,adjusted)
-    ax.axis("off")
-    plt.ion()
-    if save:
-        plt.savefig(name, bbox_inches="tight", pad_inches=0, transparent=True)
-    if show:
-        ax.set_title(name)
-        plt.show()
-    else:
-        plt.close(fig)
+    #Convert to uint8
+    maskedSkel = img_as_ubyte(maskedSkel).astype(np.uint8)
+    radius = 5
+    for point in bp:
+        rr,cc = disk(point, radius, shape = maskedSkel.shape[:2])
+        maskedSkel[rr,cc] = [0,0,255] #Blue (RGB Img)
+    for point in ep:
+        rr,cc = disk(point, radius, shape = maskedSkel.shape[:2])
+        maskedSkel[rr,cc] = [0,255,0] #Blue (RGB Img)
+    #Save and show image functionality
+    if save or show:
+        #Save image for later
+        io.imsave(name, maskedSkel)
+        
     
 
 def obtain_branch_and_end_points(graph: nx.MultiGraph):
