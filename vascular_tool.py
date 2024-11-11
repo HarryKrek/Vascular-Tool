@@ -8,11 +8,12 @@ from skimage.morphology import (
     remove_small_holes,
     isotropic_dilation,
     isotropic_erosion,
-    disk,
 )
 from skimage.measure import label
 from skimage.filters import gaussian, threshold_local
 from skimage.exposure import equalize_adapthist, rescale_intensity
+from skimage.draw import disk
+from skimage.util import img_as_ubyte
 import numpy as np
 from scipy.ndimage import distance_transform_edt
 import pandas as pd
@@ -63,7 +64,7 @@ def get_running_approval():
 
 
 def import_and_blur_image(imgPath, config):
-    sigma = config.get("Blur Sigma")
+    sigma = float(config.get("Blur Sigma"))
     img = io.imread(imgPath)
     if len(np.shape(img)) == 3:
         imgGrey = img[:, :, 1]  # Take the green channel
@@ -87,8 +88,8 @@ def segment_image(blurred):
 
 
 def remove_holes_and_small_items(segmentation, config):
-    min_object_size = config.get("Min Object Size")
-    min_hole_size = config.get("Min Hole Size")
+    min_object_size = int(config.get("Min Object Size"))
+    min_hole_size = int(config.get("Min Hole Size"))
     ensmallend = remove_small_objects(
         segmentation, min_size=min_object_size, connectivity=8
     )
@@ -103,7 +104,7 @@ def vessel_width_and_prune(skel, segmentation, config: dict):
     # Use skel as a mask to get distance_skel:
     distance_skel = distance_img * (skel > 0)
     # Prune skeleton if below required width
-    new_skel = 2 * distance_skel > config.get("Minimum Vessel Width")
+    new_skel = 2 * distance_skel > int(config.get("Minimum Vessel Width"))
     skel_width = new_skel * distance_img * 2
     return np.uint8(new_skel * 255), skel_width
 
@@ -111,7 +112,7 @@ def vessel_width_and_prune(skel, segmentation, config: dict):
 def prune_skeleton_spurs_with_graph(
     graph: nx.MultiGraph, config: dict
 ) -> nx.MultiGraph:
-    line_min = config.get("Min Spur Line Length")
+    line_min = int(config.get("Min Spur Line Length"))
     nodeRemovalCandidates = []
 
     # If node removal is 0 simply return the graph unchanged
@@ -286,7 +287,7 @@ def consolidate_internal_graph_edges(
     graph: nx.MultiGraph, config: dict
 ) -> nx.MultiGraph:
     # min Length
-    minLen = config.get("Min Length for Internal Line")
+    minLen = int(config.get("Min Length for Internal Line"))
     if minLen == 0:
         return graph
     # no nodes have been touched yet
@@ -423,8 +424,8 @@ def create_skeleton(segmentation, config):
 
 
 def draw_and_save_images(image, segmentation, bp, ep, skel, name, config):
-    save = config.get("Save Image")
-    show = config.get("Show Image")
+    save = bool(config.get("Save Image"))
+    show = bool(config.get("Show Image"))
     if not save and not show:
         pass
     # skimage.io.imsave(name, segmentation)
@@ -450,30 +451,21 @@ def draw_and_save_images(image, segmentation, bp, ep, skel, name, config):
         bg_color=None,
         saturation=1,
     )
-    adjusted = (maskedSkel * 255).astype(np.uint8)
-    fig, ax = plt.subplots()
-    fig.set_dpi(100)
-    fig.set_size_inches(16, 16)
-
-    ax.imshow(adjusted)
-    plt.scatter(
-        [point[1] for point in bp], [point[0] for point in bp], color="blue", s=50
-    )
-    plt.scatter(
-        [point[1] for point in ep], [point[0] for point in ep], color="green", s=50
-    )
-    # plt.imshow(skel > 0, alpha=0.8)
-    # Save image, not working too well at the moment+
-    # skimage.io.imsave(name,adjusted)
-    ax.axis("off")
-    if save:
-        plt.savefig(name, bbox_inches="tight", pad_inches=0, transparent=True)
-    if show:
-        ax.set_title(name)
-        plt.show()
-    else:
-        plt.close()
-
+    #Convert to uint8
+    maskedSkel = img_as_ubyte(maskedSkel).astype(np.uint8)
+    radius = 5
+    for point in bp:
+        rr,cc = disk(point, radius, shape = maskedSkel.shape[:2])
+        maskedSkel[rr,cc] = [0,0,255] #Blue (RGB Img)
+    for point in ep:
+        rr,cc = disk(point, radius, shape = maskedSkel.shape[:2])
+        maskedSkel[rr,cc] = [0,255,0] #Blue (RGB Img)
+    #Save and show image functionality
+    if save or show:
+        #Save image for later
+        io.imsave(name, maskedSkel)
+        
+    
 
 def obtain_branch_and_end_points(graph: nx.MultiGraph):
     branchPoints = []
@@ -534,32 +526,40 @@ def save_results_to_csv(savename, data):
     df.to_csv(savename)
 
 
-def worker_process(args):
+def run_img(image, resultsPath, config, saveName, i):
     try:
-        i, image, resultsPath, config = args
-        imgName = Path(image).stem
-
+        print(f"RUNNING! - {image}")
         rgbimg, blurred = import_and_blur_image(image, config)
         segmentation = segment_image(blurred)
         eroded = isotropic_erosion(segmentation, 1)
         cleaned_segmentation = remove_holes_and_small_items(eroded, config)
         skel, width_im, graph = create_skeleton(cleaned_segmentation, config)
         img_results, branchPoints, endPoints = process_image_results(
-            i, cleaned_segmentation, graph, skel, width_im, imgName
+            i, cleaned_segmentation, graph, skel, width_im, saveName
         )
         print(img_results)
-        draw_and_save_images(
-            rgbimg,
-            cleaned_segmentation,
-            branchPoints,
-            endPoints,
-            skel,
-            os.path.abspath(resultsPath + imgName + ".tif"),
-            config,
-        )
-        return img_results
+        if config['Save Image'] or config['Show Image']:
+            drawn_img = draw_and_save_images(
+                rgbimg,
+                cleaned_segmentation,
+                branchPoints,
+                endPoints,
+                skel,
+                os.path.abspath(str(resultsPath) + "\\" +saveName + ".tif"),
+                config,
+            )
+        return img_results,
     except Exception as e:
         print(f"EXCEPTION: {e}")
+
+
+def worker_process(args):
+    i, image, resultsPath, config = args
+    imgName = os.path.basename(image)
+    return run_img(image, resultsPath, config, imgName, i)
+
+async def run_batch():
+    pass
 
 
 def main(path: str, savename: str, configPath: str):
