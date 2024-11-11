@@ -81,7 +81,7 @@ def import_and_blur_image(imgPath, config):
 def segment_image(blurred):
     # Convert to uint8
     uint8Image = (blurred * 255).astype(np.uint8)
-    thresh = threshold_local(uint8Image, block_size=101)
+    thresh = threshold_local(uint8Image, block_size=3001)
     # Apply segmentation threshold
     segmentation = uint8Image > thresh
     return segmentation
@@ -196,11 +196,13 @@ def reconstruct_network_with_modifications(
     return newGraph
 
 
-def flood_find(G: nx.MultiGraph, node: int, minLength: int, root=False):
+def flood_find(G: nx.MultiGraph, node: int, minLength: int):
     global nodeResults
     # depth-first search the graph to find all connected nodes
     returnNodes = []
     returnEdges = []
+    if G.nodes[node]["touch"]:
+        return returnNodes, returnEdges
 
     # Add current node to global list
     G.nodes[node]["touch"] = True
@@ -236,6 +238,30 @@ def flood_find(G: nx.MultiGraph, node: int, minLength: int, root=False):
     if len(returnNodes) == 0 and len(returnEdges) > 0:
         raise (ValueError("Incorrect edges and nodes"))
     return returnNodes, returnEdges  # NEED TO SEPERATE THESE
+# def flood_find(G: nx.MultiGraph, node: int, minLength: int, propogation: int):
+#     returnNodes = []
+#     returnEdges = []
+#     if  G.nodes[node]["touch"]:
+#         return returnNodes, returnEdges
+    
+#     if propogation > 1:
+#         return returnNodes, returnEdges
+    
+#     #Now propogate along
+#     # Add current node to global list
+#     G.nodes[node]["touch"] = True
+
+#     # get connected nodes of node
+#     edges = [
+#         e
+#         for e in G.edges(node, keys=True)
+#         if np.size(G.edges[e].get("pts")) < minLength
+#     ]
+#     print(edges)
+#     #Get connected nodes, and their
+#     # for edge in edges:
+#     return [], []
+        
 
 
 def find_mean_node_position(G: nx.MultiGraph, nodes: list):
@@ -309,6 +335,7 @@ def consolidate_internal_graph_edges(
 
         # Node has not been touched, continue
         # Loop for checking
+        prev = 0
         while True:
             # Loop while there exists some edges that are below threshold
             # Might be worth adding a timeout
@@ -383,9 +410,11 @@ def consolidate_internal_graph_edges(
                     # Make sure that the edges are internal
                     u, v, _ = edge
                     if len(graph.edges(u)) > 1 and len(graph.edges(v)) > 1:
-                        cont = False
+                        count = len([e for e in graph.edges(keys=True) if  np.size(graph.edges[e]["pts"]) < minLen])
+                        cont = prev == count
+                        prev = count
                         break
-            if not cont:
+            if cont:
                 break
 
     return graph
@@ -428,7 +457,7 @@ def draw_and_save_images(image, segmentation, bp, ep, skel, name, config):
     show = bool(config.get("Show Image"))
     if not save and not show:
         pass
-    # skimage.io.imsave(name, segmentation)
+    # io.imsave(name, segmentation)
     # Make an image
     masked = label2rgb(
         label(segmentation * 255),
@@ -564,7 +593,7 @@ async def run_batch():
 
 def main(path: str, savename: str, configPath: str):
     startTime = time()
-    configPath = ".\\config.yml"
+    configPath = "C:\\Users\harry\\Downloads\\TESTCONFIG.yaml"
     with open(configPath, "r") as file:
         config = yaml.safe_load(file)
 
@@ -575,7 +604,7 @@ def main(path: str, savename: str, configPath: str):
     images = find_images_in_path(path)
     results = []  # list of dictionaries
     args = [
-        (i, image, resultsPath, config) for i, image in enumerate(images) if i % 5 == 0
+        (i, image, resultsPath, config) for i, image in enumerate(images)
     ]
 
     set_start_method("spawn")
