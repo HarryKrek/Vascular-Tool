@@ -142,9 +142,35 @@ class App(ctk.CTk):
             entry = ctk.CTkCheckBox(self.processing_scroll, text="")
             entry.grid(row = i, column = 1, padx = 10, pady = 10, sticky = 'ew')
             self.entries[setting] = entry
+        count = len(saveAndDisplaySettings)
+        #Add additional options for selecting how to process image
+        #options to change mode for bw selection
+        textTemp = ctk.CTkLabel(self.processing_scroll, text = "BW Conversion Method")
+        textTemp.grid(row = count, column = 0, padx = 10, pady = 10, sticky = 'ew')
+
+        self.bw_select = ctk.CTkOptionMenu(self.processing_scroll, dynamic_resizing= False,
+                                             values = ["Average", "Human Eye Level", "Individual Channel", "BW Input"],
+                                            )
+        self.bw_select.grid(row = count, column = 1, padx = 10, pady = 10, sticky = 'ew')
+        self.bwSelectText = ctk.CTkLabel(self.processing_scroll, text = "")
+        self.bwSelectText.grid(row = count + 1, column =0, padx = 10, pady = 10, sticky = 'ew')
+        self.bwSelectInputVal = ctk.CTkEntry(self.processing_scroll)
+        self.bwSelectInputVal.grid(row = count + 1, column = 1, padx=10, pady=10, sticky ='ew')
+        #options for segmentation
+        textTemp = ctk.CTkLabel(self.processing_scroll, text = "Segmentation Method")
+        textTemp.grid(row = count + 2, column = 0, padx=10, pady=10, sticky ='ew')
+        self.seg_select = ctk.CTkOptionMenu(self.processing_scroll, dynamic_resizing= False,
+                                            values = ["Global Threshold", "Otsu Global Adaptive", "Otsu Local Adaptive"],
+                                            )
+        self.seg_select.grid(row = count + 2, column = 1, padx=10, pady=10, sticky ='ew')
+        self.segSelectText = ctk.CTkLabel(self.processing_scroll, text = "")
+        self.segSelectText.grid(row = count + 3, column = 0, padx=10, pady=10, sticky = 'ew')
+        self.segSelectInputVal = ctk.CTkEntry(self.processing_scroll)
+        self.segSelectInputVal.grid(row = count + 3, column = 1, padx=10, pady=10, sticky = 'ew')
+        
         #Add button for save location, default to current directory
         self.location_button = ctk.CTkButton(self.processing_scroll, text = "Save Location", command=self.set_save_path)
-        self.location_button.grid(row = len(saveAndDisplaySettings), column = 0, padx = 10, pady =10, sticky = 'ew')
+        self.location_button.grid(row = count + 4, column = 1, padx = 10, pady =10, sticky = 'ew')
         #Set Results location to the current folder as default
         self.save_path = Path.cwd()
 
