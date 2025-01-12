@@ -330,6 +330,11 @@ class App(ctk.CTk):
         #Extract
         for key in (analysisSettings + saveAndDisplaySettings):
             self.config[key] = self.entries[key].get()
+        #Get the threshold and bw settings
+        self.config["bw mode"] = self.bw_select.get()
+        self.config["bw val"] = self.bwSelectInputVal.get()
+        self.config["segmentation mode"] = self.seg_select.get()
+        self.config["segmentatation val"] = self.segSelectInputVal.get()
         
 
     def load_settings(self):        
@@ -368,6 +373,15 @@ class App(ctk.CTk):
                         self.entries[key].select()
                     else:
                         self.entries[key].deselect()
+
+            #Get Settings for the bw/segmentation
+            self.bwSelectInputVal.insert(0, config_loaded["bw val"])
+            self.segSelectInputVal.insert(0, 
+                                          config_loaded["segmentatation val"])
+            self.bw_change(config_loaded["bw mode"])
+            self.seg_change(config_loaded["segmentation mode"])
+            self.bw_select.set(config_loaded["bw mode"])
+            self.seg_select.set(config_loaded["segmentation mode"])
         except Exception as e:
             #Pop up with exception if failiure
             FailurePopup(self, str(e))
