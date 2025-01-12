@@ -150,6 +150,7 @@ class App(ctk.CTk):
 
         self.bw_select = ctk.CTkOptionMenu(self.processing_scroll, dynamic_resizing= False,
                                              values = ["Average", "Human Eye Level", "Individual Channel", "BW Input"],
+                                             command = self.bw_change
                                             )
         self.bw_select.grid(row = count, column = 1, padx = 10, pady = 10, sticky = 'ew')
         self.bwSelectText = ctk.CTkLabel(self.processing_scroll, text = "")
@@ -161,7 +162,7 @@ class App(ctk.CTk):
         textTemp.grid(row = count + 2, column = 0, padx=10, pady=10, sticky ='ew')
         self.seg_select = ctk.CTkOptionMenu(self.processing_scroll, dynamic_resizing= False,
                                             values = ["Global Threshold", "Otsu Global Adaptive", "Otsu Local Adaptive"],
-                                            )
+                                            command = self.seg_change)
         self.seg_select.grid(row = count + 2, column = 1, padx=10, pady=10, sticky ='ew')
         self.segSelectText = ctk.CTkLabel(self.processing_scroll, text = "")
         self.segSelectText.grid(row = count + 3, column = 0, padx=10, pady=10, sticky = 'ew')
@@ -390,11 +391,43 @@ class App(ctk.CTk):
         try:
             if file_path:
                 with open(file_path, 'w') as yaml_file:
-                    yaml.dump(self.config, yaml_file, default_flow_style=False, sort_keys=False)
+                    yaml.dump(self.config, yaml_file, 
+                              default_flow_style=False, sort_keys=False)
         except Exception as e:
             FailurePopup(self, str(e))
 
 
+    def bw_change(self, value):
+        #Change visibility based on the currently selected option
+        if value == "Individual Channel":
+            #Add text to select which channel
+            self.bwSelectText.configure(text ="Channel Number: ")
+            self.bwSelectInputVal.configure(state = "normal")
+
+        else:
+            #Empty text
+            self.bwSelectText.configure(text = "")
+            #Clear entrybox
+            self.bwSelectInputVal.configure(state = "disabled", 
+                                            textvariable = "")
+
+    def seg_change(self, value):
+        #Change visibility based on the currently selected option
+        if value == "Global Threshold" or value == "Otsu Local Adaptive":
+            #Add text to select which channel
+            self.segSelectInputVal.configure(state = "normal")
+
+            if value == "Global Threshold":
+                self.segSelectText.configure(text ="Global Threshold")
+            elif value == "Otsu Local Adaptive":
+                self.segSelectText.configure(text = "Local Threshold Area")
+
+        else:
+            #Empty text
+            self.segSelectText.configure(text = "")
+            #Clear entrybox
+            self.segSelectInputVal.configure(state = "disabled", textvariable = "")
+            
     def set_save_path(self):
         try:
             self.save_path = ctk.filedialog.askdirectory()
