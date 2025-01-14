@@ -10,7 +10,7 @@ from skimage.morphology import (
     isotropic_erosion,
 )
 from skimage.measure import label
-from skimage.filters import gaussian, threshold_local
+from skimage.filters import gaussian, threshold_local, threshold_otsu
 from skimage.exposure import equalize_adapthist, rescale_intensity
 from skimage.draw import disk
 from skimage.util import img_as_ubyte
@@ -98,10 +98,20 @@ def import_and_blur_image(imgPath, config):
     return img, blurred
 
 
-def segment_image(blurred):
+def segment_image(blurred, config):
     # Convert to uint8
     uint8Image = (blurred * 255).astype(np.uint8)
-    thresh = threshold_local(uint8Image, block_size=601)
+    mode = config.get("segmentation mode")
+    val = int(config.get("segmentatation val"))
+
+    #Select what to do based upon mode variable
+    if mode == "Global Threshold":
+        thresh = val
+    elif mode == "Otsu Global Adaptive":
+        thresh = threshold_otsu(uint8Image)
+    elif mode == "Otsu Local Adaptive":
+        thresh = threshold_local(uint8Image, block_size=val)
+
     # Apply segmentation threshold
     segmentation = uint8Image > thresh
     return segmentation
@@ -578,7 +588,7 @@ def run_img(image, resultsPath, config, saveName, i):
     try:
         print(f"RUNNING! - {image}")
         rgbimg, blurred = import_and_blur_image(image, config)
-        segmentation = segment_image(blurred)
+        segmentation = segment_image(blurred,config)
         eroded = isotropic_erosion(segmentation, 1)
         cleaned_segmentation = remove_holes_and_small_items(eroded, config)
         skel, width_im, graph = create_skeleton(cleaned_segmentation, config)
