@@ -346,13 +346,15 @@ class App(ctk.CTk):
                 if type(self.entries[key]) == ctk.CTkEntry:
                     self.entries[key].delete(0, -1)
                 
+            try:
+                self.settings_path = Path(ctk.filedialog.askopenfilenames(initialdir="./", title="Select Settings File", filetypes=(
+                    ("yaml", '*.yml;*.yaml'), ("All Files", '*')))[0])
+                
+                if self.settings_path == "":
+                    pass
+            except IndexError:
+                return
 
-            self.settings_path = Path(ctk.filedialog.askopenfilenames(initialdir="./", title="Select Settings File", filetypes=(
-                ("yaml", '*.yml;*.yaml'), ("All Files", '*')))[0])
-            
-            if self.settings_path == "":
-                pass
-            
             #Load settings from yaml file
             file = open(self.settings_path, 'r')
             config_loaded = yaml.safe_load(file)
@@ -382,6 +384,8 @@ class App(ctk.CTk):
             self.seg_change(config_loaded["segmentation mode"])
             self.bw_select.set(config_loaded["bw mode"])
             self.seg_select.set(config_loaded["segmentation mode"])
+        except IndexError as e:
+            pass
         except Exception as e:
             #Pop up with exception if failiure
             FailurePopup(self, str(e))
@@ -447,7 +451,8 @@ class App(ctk.CTk):
             self.save_path = ctk.filedialog.askdirectory()
             if self.save_path == "":
                 pass
-        
+        except IndexError:
+            pass
         except Exception as e:
             FailurePopup(self, str(e))
 
