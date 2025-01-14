@@ -73,15 +73,17 @@ def import_and_blur_image(imgPath, config):
     if greyMethod == "Average":
         if len(np.shape(img)) != 3:
             raise ValueError("RGB Image not provided")
+        shape = np.shape(img)
+        imgGrey = np.zeros((shape[0], shape[1]))
         for i in range(3):
-            imgGrey = img[:, :, i]
+            imgGrey += img[:, :, i]
         imgGrey = np.uint8( 1/3 * (imgGrey))
     elif greyMethod == "Human Eye Level":
         if len(np.shape(img)) != 3:
             raise ValueError("RGB Image not provided")
         imgGrey = rgb2gray(img)
     elif greyMethod == "Individual Channel":
-        imgGrey = img[:, :, greyNumericalSup]  # Take the green channel
+        imgGrey = img[:, :, int(greyNumericalSup)]  # Take the green channel
     elif greyMethod == "BW Input":
         #check shape
         if len(np.shape(img)) != 2:
