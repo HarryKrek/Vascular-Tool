@@ -66,11 +66,29 @@ def get_running_approval():
 def import_and_blur_image(imgPath, config):
     sigma = float(config.get("Blur Sigma"))
     img = io.imread(imgPath)
-    if len(np.shape(img)) == 3:
-        imgGrey = img[:, :, 1]  # Take the green channel
-    else:
+
+    #Get grey image depending on the config
+    greyMethod = config["bw mode"]
+    greyNumericalSup = config["bw val"]
+    if greyMethod == "Average":
+        if len(np.shape(img)) != 3:
+            raise ValueError("RGB Image not provided")
+        for i in range(3):
+            imgGrey = img[:, :, i]
+        imgGrey = np.uint8( 1/3 * (imgGrey))
+    elif greyMethod == "Human Eye Level":
+        if len(np.shape(img)) != 3:
+            raise ValueError("RGB Image not provided")
+        imgGrey = rgb2gray(img)
+    elif greyMethod == "Individual Channel":
+        imgGrey = img[:, :, greyNumericalSup]  # Take the green channel
+    elif greyMethod == "BW Input":
+        #check shape
+        if len(np.shape(img)) != 2:
+            raise ValueError("BW Image not provided")
         imgGrey = img
-    rescaled_grey = rescale_intensity(imgGrey)
+    
+    rescaled_grey = rescale_intensity(imgGrey) 
     adapted_hist = equalize_adapthist(rescaled_grey)
     blurred = gaussian(
         adapted_hist, sigma=(sigma, sigma), truncate=3.5, channel_axis=-1
@@ -81,7 +99,7 @@ def import_and_blur_image(imgPath, config):
 def segment_image(blurred):
     # Convert to uint8
     uint8Image = (blurred * 255).astype(np.uint8)
-    thresh = threshold_local(uint8Image, block_size=3001)
+    thresh = threshold_local(uint8Image, block_size=601)
     # Apply segmentation threshold
     segmentation = uint8Image > thresh
     return segmentation
@@ -524,7 +542,6 @@ def vessel_statistics_from_graph(graph: nx.MultiGraph, skel):
     totalLen = graphSum  # np.count_nonzero(skel)
     return totalLen, graphSum / len(graph.edges())
 
-
 def process_image_results(i, segmentation, graph, skel, widthImage, imgName):
     try:
         results = {}
@@ -580,6 +597,7 @@ def run_img(image, resultsPath, config, saveName, i):
         return img_results,
     except Exception as e:
         print(f"EXCEPTION: {e}")
+        raise e
 
 
 def worker_process(args):
@@ -593,7 +611,7 @@ async def run_batch():
 
 def main(path: str, savename: str, configPath: str):
     startTime = time()
-    configPath = "C:\\Users\harry\\Downloads\\TESTCONFIG.yaml"
+    configPath = "C:\\Users\\harry\\Documents\\Thesis\\Vascular-Tool\\config.yml"
     with open(configPath, "r") as file:
         config = yaml.safe_load(file)
 

@@ -463,6 +463,9 @@ class App(ctk.CTk):
         #Check to make sure its been filled
         for val in self.config:
             if self.config[val] == '':
+                if val == "bw val" or val == "segmentation val":
+                    continue
+                
                 FailurePopup(self, 'Missing Settings Inputs')
                 return
         #Run Relevant process
@@ -500,10 +503,18 @@ class App(ctk.CTk):
 
             future = self.executor.submit(run_img, self.imgPath, self.save_path, 
                                     self.config, f"result_{self.img_count}", 0)
-            future.add_done_callback(lambda f: self.after(0, self.handle_result_single, f.result()))  # Use after() to run on main thread
+            future.add_done_callback(self.handle_future_result)  # Delegate the callback
 
         except Exception as e:
             FailurePopup(self, str(e))
+
+    def handle_future_result(self, future):
+        try:
+            # Check if an exception was raised during the execution of the future
+            future.result()  # This will raise any exception that occurred during the execution
+            self.after(0, self.handle_result_single, future.result())  # Use after() to run on main thread
+        except Exception as e:
+            FailurePopup(self, f"An error occurred in the task: {str(e)}")
 
     def run_tool_batch(self):
         self.batch_results = []
